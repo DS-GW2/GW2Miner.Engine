@@ -1,0 +1,12 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="GW2Miner.Engine.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="SessionKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)">9E141C69-FCFE-4F4B-BE85-19B485DABC3C</Value>
+    </Setting>
+    <Setting Name="CharId" Type="System.String" Scope="User">
+      <Value Profile="(Default)">900EF1C5-6DEE-E111-8D5B-9C8E990DC2EE</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
