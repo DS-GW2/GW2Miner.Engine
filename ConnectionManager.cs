@@ -593,7 +593,7 @@ namespace GW2Miner.Engine
                 ProcessMemoryScanner scanner = new ProcessMemoryScanner(p);
 
                 // find current session key
-                string szSearchPattern = "83C708A3xxxxxxxx";
+                string szSearchPattern = "8B4214A3xxxxxxxx";
 
                 Guid sessionKey = scanner.FindGuid(szSearchPattern, 4);
 
