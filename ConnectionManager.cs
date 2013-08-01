@@ -15,6 +15,9 @@ using GW2SessionKey;
 
 namespace GW2Miner.Engine
 {
+    /// <summary>
+    /// TODO: Add MumbleLink class to access Mumble shared memory?
+    /// </summary>
     public class ConnectionManager
     {
         private static ConnectionManager _singleton;
@@ -592,6 +595,7 @@ namespace GW2Miner.Engine
 
                 ProcessMemoryScanner scanner = new ProcessMemoryScanner(p);
 
+                //TODO: Grab search pattern from config file instead
                 // find current session key
                 string szSearchPattern = "8B4214A3xxxxxxxx";
 
@@ -625,6 +629,8 @@ namespace GW2Miner.Engine
                 //    processes = Process.GetProcessesByName("awesomium_process");
                 //}
 
+                //TODO: Grab search pattern from config file instead
+                //      or grab the character id guid from Mumble shared memory instead
                 // find current character id
                 szSearchPattern = "898560FFFFFFA1xxxxxxxx";
 

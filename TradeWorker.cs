@@ -49,18 +49,18 @@ namespace GW2Miner.Engine
         private static Dictionary<int, gw2dbItem> dataIdToItem = new Dictionary<int, gw2dbItem>();
         private static bool gw2dbLoaded = false, gw2apiLoaded = false;
 
-        private static Dictionary<int, gw2apiRecipe> gw2api_recipeIdToRecipe = new Dictionary<int, gw2apiRecipe>();
+        public static Dictionary<int, gw2apiRecipe> gw2api_recipeIdToRecipe = new Dictionary<int, gw2apiRecipe>();
         private static Dictionary<int, gw2apiItem> gw2api_dataIdToItem = new Dictionary<int, gw2apiItem>();
 
         static TradeWorker()
         {
-            _gw2apim = new Gw2apiManager();
-            LoadGw2API();
-            //T.Wait();
+                _gw2apim = new Gw2apiManager();
+                LoadGw2API();
+                //T.Wait();
 
-            _dbm = new Gw2dbManager();
-            LoadGw2DB();
-            //L.Wait();
+                _dbm = new Gw2dbManager();
+                LoadGw2DB();
+                //L.Wait();
         }
 
         public TradeWorker()

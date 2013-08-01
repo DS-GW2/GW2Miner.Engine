@@ -14,6 +14,9 @@ using GW2SessionKey;
 
 namespace GW2Miner.Engine
 {
+    /// <summary>
+    /// TODO: The strength of gw2spidy is the constant monitoring of prices.  Add routine to calculate the monthly average buy and sell prices for the last month, for an item.
+    /// </summary>
     public class Gw2spidyManager
     {
         public async Task<Stream> RequestGw2spidyItem(int itemId)
