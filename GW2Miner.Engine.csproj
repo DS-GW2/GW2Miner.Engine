@@ -71,6 +71,7 @@
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
     <Compile Include="ReflectionUtils.cs" />
+    <Compile Include="TimeSlots.cs" />
     <Compile Include="TradeWorker.cs" />
   </ItemGroup>
   <ItemGroup>

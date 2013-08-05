@@ -20,6 +20,14 @@ namespace GW2Miner.Engine
     /// </summary>
     public class ConnectionManager
     {
+        /// <summary>
+        /// TODO: Add these to config 
+        /// </summary>
+        private static readonly double FLOOD_CONTROL_MS = 12000.0;
+        private static readonly int MAX_FLOOD_CONTROL_TIMESLOTS = 3;
+        private static readonly int RETRY_LIMIT = 3;
+
+        private static TimeSlots _timeSlots = new TimeSlots(MAX_FLOOD_CONTROL_TIMESLOTS, FLOOD_CONTROL_MS);
         private static ConnectionManager _singleton;
         private static Object _classLock = typeof(ConnectionManager);
 
@@ -43,7 +51,7 @@ namespace GW2Miner.Engine
         CookieContainer _cookieJar = new CookieContainer();
         private Cookie _gameSessionKey;
         //private Cookie _mySessionKey;
-        private bool _retryRequest = false;
+        private int _retryRequest = 0;
         private string _charId;
 
         public static ConnectionManager Instance
@@ -303,6 +311,8 @@ namespace GW2Miner.Engine
                 await Login();
             }
 
+            WaitForFloodControl();
+
             try
             {
                 HttpClientHandler handler = new HttpClientHandler()
@@ -343,20 +353,28 @@ namespace GW2Miner.Engine
                           HttpResponseMessage postResponse = postTask.Result;
 
                           // NOTE: 401 Status Code here if session key has expired!
-                          if (postResponse.StatusCode == HttpStatusCode.Unauthorized && !_retryRequest)
+                          if (postResponse.StatusCode == HttpStatusCode.Unauthorized && (_retryRequest == 0))
                           {
                               if (UseGameSessionKey)
                               {
                                   GetGameClientInfo();
                               }
-                              _retryRequest = true;
+                              _retryRequest++;
                               Task t = Task.Run(async () => { return await Post(url, referrer, true, postData); });
                               t.Wait();
                               return;
                           }
+                          else if ((postResponse.StatusCode == HttpStatusCode.ServiceUnavailable || postResponse.StatusCode == HttpStatusCode.BadGateway || 
+                                                        postResponse.StatusCode == HttpStatusCode.InternalServerError)
+                                        && (_retryRequest < RETRY_LIMIT))
+                          {
+                              _retryRequest++;
+                              Task t = Task.Run(async () => { return await Post(url, referrer, true, postData); });
+                              t.Wait();
+                          }
                           else
                           {
-                              _retryRequest = false;
+                              _retryRequest = 0;
                               postResponse.EnsureSuccessStatusCode();
                               _stream = postResponse.Content.ReadAsStreamAsync().Result;
                               _stream = ProcessCompression(_stream, postResponse);
@@ -395,6 +413,8 @@ namespace GW2Miner.Engine
                 await Login();
             }
 
+            WaitForFloodControl();
+
             try
             {
                 HttpClientHandler handler = new HttpClientHandler()
@@ -432,20 +452,28 @@ namespace GW2Miner.Engine
                             HttpResponseMessage getResponse = getTask.Result;
 
                             // NOTE: 401 Status Code here if session key has expired!
-                            if (getResponse.StatusCode == HttpStatusCode.Unauthorized && !_retryRequest)
+                            if (getResponse.StatusCode == HttpStatusCode.Unauthorized && (_retryRequest == 0))
                             {
                                 if (UseGameSessionKey)
                                 {
                                     GetGameClientInfo();
                                 }
-                                _retryRequest = true;
+                                _retryRequest++;
                                 Task t = Task.Run(async () => { return await Request(url, referrer, true); });
                                 t.Wait();
                                 return;
                             }
+                            else if ((getResponse.StatusCode == HttpStatusCode.ServiceUnavailable || getResponse.StatusCode == HttpStatusCode.BadGateway ||
+                                                        getResponse.StatusCode == HttpStatusCode.InternalServerError)
+                                        && (_retryRequest < RETRY_LIMIT))
+                            {
+                                _retryRequest++;
+                                Task t = Task.Run(async () => { return await Request(url, referrer, true); });
+                                t.Wait();
+                            }
                             else
                             {
-                                _retryRequest = false;
+                                _retryRequest = 0;
                                 getResponse.EnsureSuccessStatusCode();
                                 _stream = getResponse.Content.ReadAsStreamAsync().Result;
                                 _stream = ProcessCompression(_stream, getResponse);
@@ -476,14 +504,15 @@ namespace GW2Miner.Engine
         {
             if (UseGameSessionKey)
             {
-                _logined = true;
-                _loggingIn = false;
+                IndicateLogined();
                 return;
             }
 
             if (!_loggingIn)
             {
                 _loggingIn = true;
+
+                WaitForFloodControl();
 
                 try
                 {
@@ -552,19 +581,37 @@ namespace GW2Miner.Engine
                                     UseGameSessionKey = true;
                                 }
                             }
-                            _logined = true;
-                            _loggingIn = false;
+                            IndicateLogined();
                         });
                 }
                 catch (Exception e)
                 {
-                    if (!_catchExceptions) throw e;
+                    if (UseGameSessionKey)
+                    {
+                        if (!_catchExceptions) throw e;
 
-                    // handle error
-                    Console.WriteLine("Login Exception:");
-                    Console.WriteLine(e.Message);
+                        // handle error
+                        Console.WriteLine("Login Exception:");
+                        Console.WriteLine(e.Message);
+                    }
+                    else
+                    {
+                        UseGameSessionKey = true;
+                        IndicateLogined();
+                    }
                 }
             }
+        }
+
+        private void IndicateLogined()
+        {
+            _logined = true;
+            _loggingIn = false;
+        }
+
+        private void WaitForFloodControl()
+        {
+            _timeSlots.GetSlot();
         }
 
         private void GetGameClientInfo()
@@ -663,7 +710,7 @@ namespace GW2Miner.Engine
             bool tempExceptionsSetting = _catchExceptions;
             _catchExceptions = false;
             UseGameSessionKey = true;
-            _retryRequest = true;
+            _retryRequest = RETRY_LIMIT;
 
             bool needToWait = true;
             while (needToWait)
@@ -683,7 +730,7 @@ namespace GW2Miner.Engine
             }
 
             _catchExceptions = tempExceptionsSetting;
-            _retryRequest = false;
+            _retryRequest = 0;
         }
     }
 }
