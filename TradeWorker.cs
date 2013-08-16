@@ -1484,6 +1484,7 @@ namespace GW2Miner.Engine
                 while ((listCount - origOffset + 1) > listSize)
                 {
                     int offset = listSize + origOffset;
+                    // TODO: If past == true, attempt to read from saved JSON file instead first
                     itemStreams = await _cm.RequestMyBuysSells(buy, false, offset, past, listCount - listSize - origOffset + 1);
                     lock (classLock)
                     {
@@ -1539,7 +1540,7 @@ namespace GW2Miner.Engine
             }
         }
 
-        private gw2dbItem SearchGW2DBItem(string name)
+        public gw2dbItem SearchGW2DBItem(string name)
         {
             List<gw2dbItem> list = dataIdToItem.Values.ToList();
             foreach (gw2dbItem item in list)

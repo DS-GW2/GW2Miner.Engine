@@ -23,8 +23,9 @@ namespace GW2Miner.Engine
         /// <summary>
         /// TODO: Add these to config 
         /// </summary>
-        private static readonly double FLOOD_CONTROL_MS = 12000.0;
+        private static readonly int RETRY_COOLDOWN = 4000;
         private static readonly int MAX_FLOOD_CONTROL_TIMESLOTS = 3;
+        private static readonly double FLOOD_CONTROL_MS = RETRY_COOLDOWN * MAX_FLOOD_CONTROL_TIMESLOTS;
         private static readonly int RETRY_LIMIT = 3;
 
         private static TimeSlots _timeSlots = new TimeSlots(MAX_FLOOD_CONTROL_TIMESLOTS, FLOOD_CONTROL_MS);
@@ -368,6 +369,7 @@ namespace GW2Miner.Engine
                                                         postResponse.StatusCode == HttpStatusCode.InternalServerError)
                                         && (_retryRequest < RETRY_LIMIT))
                           {
+                              Thread.Sleep(RETRY_COOLDOWN);
                               _retryRequest++;
                               Task t = Task.Run(async () => { return await Post(url, referrer, true, postData); });
                               t.Wait();
@@ -467,6 +469,7 @@ namespace GW2Miner.Engine
                                                         getResponse.StatusCode == HttpStatusCode.InternalServerError)
                                         && (_retryRequest < RETRY_LIMIT))
                             {
+                                Thread.Sleep(RETRY_COOLDOWN);
                                 _retryRequest++;
                                 Task t = Task.Run(async () => { return await Request(url, referrer, true); });
                                 t.Wait();
