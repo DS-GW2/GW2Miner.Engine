@@ -66,6 +66,22 @@ namespace GW2Miner.Engine
             }
         }
 
+        public static Stream ProcessCompression(Stream stream, HttpResponseMessage response)
+        {
+            Stream processedStream = stream;
+
+            if (response.Content.Headers.ContentEncoding.Contains(gzip.Value))
+            {
+                processedStream = new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Decompress);
+            }
+            else if (response.Content.Headers.ContentEncoding.Contains(deflate.Value))
+            {
+                processedStream = new System.IO.Compression.DeflateStream(stream, System.IO.Compression.CompressionMode.Decompress);
+            }
+
+            return processedStream;
+        }
+
         private ConnectionManager()
         {
             string configFilePath = string.Format("{0}\\GW2TP.Config", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
@@ -265,22 +281,6 @@ namespace GW2Miner.Engine
 
         private static readonly StringWithQualityHeaderValue gzip = StringWithQualityHeaderValue.Parse("gzip");
         private static readonly StringWithQualityHeaderValue deflate = StringWithQualityHeaderValue.Parse("deflate");
-
-        private Stream ProcessCompression(Stream stream, HttpResponseMessage response)
-        {
-            Stream processedStream = stream;
-
-            if (response.Content.Headers.ContentEncoding.Contains(gzip.Value))
-            {
-                processedStream = new System.IO.Compression.GZipStream(stream, System.IO.Compression.CompressionMode.Decompress);
-            }
-            else if (response.Content.Headers.ContentEncoding.Contains(deflate.Value))
-            {
-                processedStream = new System.IO.Compression.DeflateStream(stream, System.IO.Compression.CompressionMode.Decompress);
-            }
-
-            return processedStream;
-        }
 
         //private void SwapSessionKey(Uri uri, Cookie newSessionKey)
         //{

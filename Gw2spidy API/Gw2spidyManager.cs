@@ -33,7 +33,7 @@ namespace GW2Miner.Engine
         //    return await Request(url);
         //}
 
-        private async Task<Stream> Request(String url)
+        private async Task<Stream> Request(String url, bool acceptGzip = true, bool acceptDeflate = true)
         {
             Stream stream = null;
             try
@@ -45,7 +45,8 @@ namespace GW2Miner.Engine
 
                 client.MaxResponseContentBufferSize = 3000000;
 
-                client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
+                if (acceptGzip) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
+                if (acceptDeflate) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
                 client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("en"));
                 client.DefaultRequestHeaders.AcceptCharset.Add(new StringWithQualityHeaderValue("en"));
                 client.DefaultRequestHeaders.Connection.Add(@"keep-alive");
@@ -67,6 +68,7 @@ namespace GW2Miner.Engine
                           HttpResponseMessage getResponse = getTask.Result;
                           getResponse.EnsureSuccessStatusCode();
                           stream = getResponse.Content.ReadAsStreamAsync().Result;
+                          stream = ConnectionManager.ProcessCompression(stream, getResponse);
                        });
             }
             catch (Exception e)
