@@ -419,19 +419,34 @@ namespace GW2Miner.Engine
                 TimeSpan span = DateTime.Now - lastUpdated;
                 if (span.TotalMinutes > this.RecipeUpdatedTimeSpanInMinutes)
                 {
-                    List<Item> items = this.get_items(recipe.CreatedDataId).Result;
-                    if (items != null && items.Count > 0)
+                    gw2spidyItem spidyItem;
+                    List<Item> items;
+                    try
                     {
-                        recipe.CreatedItemMinSaleUnitPrice = items[0].MinSaleUnitPrice;
-                        recipe.CreatedItemMaxBuyUnitPrice = items[0].MaxOfferUnitPrice;
-                        recipe.CreatedItemVendorBuyUnitPrice = items[0].VendorPrice * 8;
-                    }
-                    else
-                    {
-                        recipe.CreatedItemMinSaleUnitPrice = 0;
-                        recipe.CreatedItemMaxBuyUnitPrice = 0;
+                        spidyItem = this.get_gw2spidy_item(recipe.CreatedDataId).Result;
+
+                        recipe.CreatedItemMinSaleUnitPrice = spidyItem.MinSaleUnitPrice;
+                        recipe.CreatedItemMaxBuyUnitPrice = spidyItem.MaxOfferUnitPrice;
                         recipe.CreatedItemVendorBuyUnitPrice = 0;
                     }
+                    catch
+                    {
+                        items = this.get_items(recipe.CreatedDataId).Result;
+
+                        if (items != null && items.Count > 0)
+                        {
+                            recipe.CreatedItemMinSaleUnitPrice = items[0].MinSaleUnitPrice;
+                            recipe.CreatedItemMaxBuyUnitPrice = items[0].MaxOfferUnitPrice;
+                            recipe.CreatedItemVendorBuyUnitPrice = items[0].VendorPrice * 8;
+                        }
+                        else
+                        {
+                            recipe.CreatedItemMinSaleUnitPrice = 0;
+                            recipe.CreatedItemMaxBuyUnitPrice = 0;
+                            recipe.CreatedItemVendorBuyUnitPrice = 0;
+                        }
+                    }
+
                     CreatedIdToRecipe[recipe.CreatedDataId].CreatedItemMinSaleUnitPrice = recipe.CreatedItemMinSaleUnitPrice;
                     CreatedIdToRecipe[recipe.CreatedDataId].CreatedItemMaxBuyUnitPrice = recipe.CreatedItemMaxBuyUnitPrice;
                     CreatedIdToRecipe[recipe.CreatedDataId].CreatedItemVendorBuyUnitPrice = recipe.CreatedItemVendorBuyUnitPrice;
@@ -538,7 +553,8 @@ namespace GW2Miner.Engine
                 String itemsString = String.Join(",", item_ids);
                 String query = String.Format("ids={0}", itemsString);
 
-                return await Search(query, true, 1, item_ids.Count());
+                //return await Search(query, true, 1, item_ids.Count());
+                return await Items(query);
             }
             return new List<Item>();
         }
@@ -1452,6 +1468,44 @@ namespace GW2Miner.Engine
                     ItemList itemList = itemParser.Parse(itemStreams);
                     UpdateArgs(ref this.searchArgs, -1, this.searchArgs.count + itemList.Items.Count, allItemList.Total); // Record the last search max count
                     count = (allPages ? itemList.Total : Math.Min(requested, itemList.Total));
+                    retItemList.AddRange(itemList.Items);
+                    listSize = retItemList.Count;
+                    //listCount = itemList.Total;
+                }
+            }
+
+            return retItemList;
+        }
+
+        private async Task<List<Item>> Items(string query)
+        {
+            Stream itemStreams = await _cm.RequestItems("items", query, false);
+
+            ItemParser itemParser = new ItemParser();
+            ItemList allItemList;
+            List<Item> retItemList;
+            int count, listSize;
+            lock (classLock)
+            {
+                allItemList = itemParser.Parse(itemStreams);
+                retItemList = allItemList.Items;
+
+                if (allItemList.args != null) UpdateArgs(ref this.searchArgs, allItemList.args.Offset, retItemList.Count, allItemList.Total); // Record the last search max count
+
+                count = allItemList.Total;
+                listSize = retItemList.Count;
+            }
+
+            //int listCount = allItemList.Total;
+            while (count > listSize)
+            {
+                int offset = listSize + 1;
+                itemStreams = await _cm.RequestItems("items", String.Concat(query, String.Format("&offset={0}&count={1}", offset, count - listSize)), false);
+                lock (classLock)
+                {
+                    ItemList itemList = itemParser.Parse(itemStreams);
+                    UpdateArgs(ref this.searchArgs, -1, this.searchArgs.count + itemList.Items.Count, allItemList.Total); // Record the last search max count
+                    count = itemList.Total;
                     retItemList.AddRange(itemList.Items);
                     listSize = retItemList.Count;
                     //listCount = itemList.Total;

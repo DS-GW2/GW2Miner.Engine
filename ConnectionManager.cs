@@ -371,7 +371,7 @@ namespace GW2Miner.Engine
                           {
                               Thread.Sleep(RETRY_COOLDOWN);
                               _retryRequest++;
-                              Task t = Task.Run(async () => { return await Post(url, referrer, true, postData); });
+                              Task t = Task.Run(async () => { return await Post(url, referrer, false, postData); });
                               t.Wait();
                           }
                           else
@@ -471,7 +471,7 @@ namespace GW2Miner.Engine
                             {
                                 Thread.Sleep(RETRY_COOLDOWN);
                                 _retryRequest++;
-                                Task t = Task.Run(async () => { return await Request(url, referrer, true); });
+                                Task t = Task.Run(async () => { return await Request(url, referrer, false); });
                                 t.Wait();
                             }
                             else
