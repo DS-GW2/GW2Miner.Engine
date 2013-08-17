@@ -246,7 +246,7 @@ namespace GW2Miner.Engine
             gw2dbLoaded = true;
         }
 
-        private static void ProcessRecipes(List<gw2dbRecipe> gw2dbRecipeList, Dictionary<int, int> itemIdToDataId, bool noConvertDataIds = false)
+        public static void ProcessRecipes(List<gw2dbRecipe> gw2dbRecipeList, Dictionary<int, int> itemIdToDataId, bool noConvertDataIds = false)
         {
             foreach (gw2dbRecipe recipe in gw2dbRecipeList)
             {
@@ -278,7 +278,7 @@ namespace GW2Miner.Engine
             }
         }
 
-        private static List<gw2dbRecipe> BuildRecipe(gw2dbRecipe recipe)
+        public static List<gw2dbRecipe> BuildRecipe(gw2dbRecipe recipe)
         {
             gw2dbItem item = dataIdToItem[recipe.CreatedDataId];
 
@@ -1555,6 +1555,7 @@ namespace GW2Miner.Engine
             if (string.Compare("Cherry", name, true) == 0) return "Cherries";
             else if (string.Compare("Peach", name, true) == 0) return "Peaches";
             else if (string.Compare("Glass of Buttermilk", name, true) == 0) return "Buttermilk";
+            else if (string.Compare("Packet of Yeast", name, true) == 0) return "Yeast";
             else if ((string.Compare("Cumin", name, true) == 0) || (string.Compare("Horseradish Root", name, true) == 0)) return name;
             else return name + "s";
         }
@@ -1566,8 +1567,12 @@ namespace GW2Miner.Engine
             gw2dbItem item = GetGW2DBItem(dataId);
             if (item == null) return null;
             string name = item.Name;
-            int lastIndex = name.LastIndexOf('[');
-            if (lastIndex >= 0) name = name.Remove(lastIndex);
+
+            string pattern = Regex.Escape("[") + ".*?]";
+            name = Regex.Replace(name, pattern, string.Empty);
+
+            //int lastIndex = name.LastIndexOf('[');
+            //if (lastIndex >= 0) name = name.Remove(lastIndex);
             return SearchGW2DBItem(Plural(name) + " in Bulk");
         }
 
