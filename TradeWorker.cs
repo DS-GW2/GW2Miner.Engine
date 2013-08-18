@@ -29,6 +29,10 @@ namespace GW2Miner.Engine
 
         public static bool gettingSessionKey = false;
 
+        private readonly int MAX_GW2SPIDY_RETRIES = 3; // max retries for gw2spidy call before giving up
+        private bool _useGW2Spidy = true; // use gw2spidy for min acquisition cost routine
+        private int _gw2SpidyRetries = 0;
+
         private static Object classLock = typeof(TradeWorker);
         private static Object _CreatedIdToRecipeLocked = new Object();
         private static Gw2apiManager _gw2apim;
@@ -419,25 +423,37 @@ namespace GW2Miner.Engine
                 TimeSpan span = DateTime.Now - lastUpdated;
                 if (span.TotalMinutes > this.RecipeUpdatedTimeSpanInMinutes)
                 {
-                    gw2spidyItem spidyItem;
-                    List<Item> items;
+                    gw2spidyItem spidyItem = null;
+                    List<Item> items = null;
                     try
                     {
-                        spidyItem = this.get_gw2spidy_item(recipe.CreatedDataId).Result;
+                        if (_useGW2Spidy)
+                        {
+                            spidyItem = this.get_gw2spidy_item(recipe.CreatedDataId).Result;
 
-                        recipe.CreatedItemMinSaleUnitPrice = spidyItem.MinSaleUnitPrice;
-                        recipe.CreatedItemMaxBuyUnitPrice = spidyItem.MaxOfferUnitPrice;
-                        recipe.CreatedItemVendorBuyUnitPrice = 0;
+                            _gw2SpidyRetries = 0;  // reset counter
+
+                            recipe.CreatedItemMinSaleUnitPrice = spidyItem.MinSaleUnitPrice;
+                            recipe.CreatedItemMaxBuyUnitPrice = spidyItem.MaxOfferUnitPrice;
+                            recipe.CreatedItemVendorBuyUnitPrice = 0;
+                        }
                     }
                     catch
                     {
+                    }
+
+                    if (spidyItem == null)
+                    {
+                        _gw2SpidyRetries++; // increment counter for gw2spidy failures
+                        if (_gw2SpidyRetries >= MAX_GW2SPIDY_RETRIES) _useGW2Spidy = false; // give up and turn off gw2spidy
+
                         items = this.get_items(recipe.CreatedDataId).Result;
 
                         if (items != null && items.Count > 0)
                         {
                             recipe.CreatedItemMinSaleUnitPrice = items[0].MinSaleUnitPrice;
                             recipe.CreatedItemMaxBuyUnitPrice = items[0].MaxOfferUnitPrice;
-                            recipe.CreatedItemVendorBuyUnitPrice = items[0].VendorPrice * 8;
+                            recipe.CreatedItemVendorBuyUnitPrice = items[0].VendorPrice * 8; // Doesn't matter as code after doesn't make use of this value now
                         }
                         else
                         {
