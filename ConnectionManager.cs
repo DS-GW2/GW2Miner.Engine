@@ -361,7 +361,7 @@ namespace GW2Miner.Engine
                                   GetGameClientInfo();
                               }
                               _retryRequest++;
-                              Task t = Task.Run(async () => { return await Post(url, referrer, true, postData); });
+                              Task t = Task.Run(async () => { return await Post(url, referrer, true, postData, acceptGzip, acceptDeflate); });
                               t.Wait();
                               return;
                           }
@@ -371,7 +371,7 @@ namespace GW2Miner.Engine
                           {
                               Thread.Sleep(RETRY_COOLDOWN);
                               _retryRequest++;
-                              Task t = Task.Run(async () => { return await Post(url, referrer, false, postData); });
+                              Task t = Task.Run(async () => { return await Post(url, referrer, false, postData, acceptGzip, acceptDeflate); });
                               t.Wait();
                           }
                           else
@@ -461,7 +461,7 @@ namespace GW2Miner.Engine
                                     GetGameClientInfo();
                                 }
                                 _retryRequest++;
-                                Task t = Task.Run(async () => { return await Request(url, referrer, true); });
+                                Task t = Task.Run(async () => { return await Request(url, referrer, true, acceptGzip, acceptDeflate); });
                                 t.Wait();
                                 return;
                             }
@@ -471,7 +471,7 @@ namespace GW2Miner.Engine
                             {
                                 Thread.Sleep(RETRY_COOLDOWN);
                                 _retryRequest++;
-                                Task t = Task.Run(async () => { return await Request(url, referrer, false); });
+                                Task t = Task.Run(async () => { return await Request(url, referrer, false, acceptGzip, acceptDeflate); });
                                 t.Wait();
                             }
                             else

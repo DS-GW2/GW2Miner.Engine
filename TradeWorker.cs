@@ -9,6 +9,8 @@ using System.Text.RegularExpressions;
 using GW2Miner.Domain;
 using System.Diagnostics;
 using System.Configuration;
+using ServiceStack.Redis;
+using ServiceStack.Redis.Generic;
 
 namespace GW2Miner.Engine
 {
@@ -444,8 +446,11 @@ namespace GW2Miner.Engine
 
                     if (spidyItem == null)
                     {
-                        _gw2SpidyRetries++; // increment counter for gw2spidy failures
-                        if (_gw2SpidyRetries >= MAX_GW2SPIDY_RETRIES) _useGW2Spidy = false; // give up and turn off gw2spidy
+                        if (_useGW2Spidy)
+                        {
+                            _gw2SpidyRetries++; // increment counter for gw2spidy failures
+                            if (_gw2SpidyRetries >= MAX_GW2SPIDY_RETRIES) _useGW2Spidy = false; // give up and turn off gw2spidy
+                        }
 
                         items = this.get_items(recipe.CreatedDataId).Result;
 
@@ -796,6 +801,12 @@ namespace GW2Miner.Engine
         {
             if (!TradeWorker.gettingSessionKey)
             {
+                //using (var redisClient = new RedisClient("localhost", 6379, "thhedh11"))
+                //{
+                //    IRedisTypedClient<Item> redis = redisClient.As<Item>();
+
+                //    IRedisList<Item> oldBoughtList = redis.Lists["urn:GW2Miner:Engine:BoughtList"];                    
+                //}
                 return await get_my_buys_sells(true, allPages, past, offset, count);
             }
             return new List<Item>();
