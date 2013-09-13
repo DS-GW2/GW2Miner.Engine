@@ -111,6 +111,74 @@ namespace GW2Miner.Engine
         }
     }
 
+    public class gw2spidyOneRecipeParser
+    {
+        public Object classLock = typeof(gw2spidyOneRecipeParser);
+        public event EventHandler<NewParsedObjectEventArgs<Item>> ObjectParsed;
+
+        private void OnObjectParsed(Item newItem)
+        {
+            if (this.ObjectParsed != null)
+            {
+                this.ObjectParsed(this, new NewParsedObjectEventArgs<Item>(newItem));
+            }
+        }
+
+        public gw2spidyRecipeResult Parse(Stream inputStream)
+        {
+            lock (classLock)
+            {
+                JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+                // Create a serializer
+                JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                using (StreamReader streamReader = new StreamReader(inputStream, new UTF8Encoding(false, true)))
+                {
+                    using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+                    {
+                        //jsonTextReader.DateParseHandling = DateParseHandling.None;
+                        return ((gw2spidyRecipeResult)serializer.Deserialize(jsonTextReader, typeof(gw2spidyRecipeResult)));
+                    }
+                }
+            }
+        }
+    }
+
+    public class gw2spidyRecipeListParser
+    {
+        public Object classLock = typeof(gw2spidyRecipeListParser);
+        public event EventHandler<NewParsedObjectEventArgs<Item>> ObjectParsed;
+
+        private void OnObjectParsed(Item newItem)
+        {
+            if (this.ObjectParsed != null)
+            {
+                this.ObjectParsed(this, new NewParsedObjectEventArgs<Item>(newItem));
+            }
+        }
+
+        public gw2spidyRecipeList Parse(Stream inputStream)
+        {
+            lock (classLock)
+            {
+                JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+                // Create a serializer
+                JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                using (StreamReader streamReader = new StreamReader(inputStream, new UTF8Encoding(false, true)))
+                {
+                    using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+                    {
+                        //jsonTextReader.DateParseHandling = DateParseHandling.None;
+                        return ((gw2spidyRecipeList)serializer.Deserialize(jsonTextReader, typeof(gw2spidyRecipeList)));
+                    }
+                }
+            }
+        }
+    }
+
     public class gw2apiItemParser
     {
         public Object classLock = typeof(gw2apiItemParser);

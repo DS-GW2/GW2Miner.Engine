@@ -53,7 +53,7 @@ namespace GW2Miner.Engine
         private Cookie _gameSessionKey;
         //private Cookie _mySessionKey;
         private int _retryRequest = 0;
-        private string _charId;
+        private string _charId, _loginEmail;
 
         public static ConnectionManager Instance
         {
@@ -691,6 +691,21 @@ namespace GW2Miner.Engine
                     _config.AppSettings.Settings["CharId"].Value = _charId;
                 else
                     _config.AppSettings.Settings.Add("CharId", _charId);
+
+
+                //TODO: Grab search pattern from config file instead
+                //CPU Disasm
+                //Address   Hex dump          Command                                  Comments
+                //006E133F      CC            INT3
+                //006E1340  /$  8BD1          MOV EDX,ECX
+                //006E1342  |.  68 80000000   PUSH 80                                  ; /Arg1 = 80
+                //006E1347  |.  B9 98A06601   MOV ECX,OFFSET 0166A098                  ; |ASCII "clientreport@arena.net"
+                //006E134C  |.  E8 4F6DFEFF   CALL 006C80A0                            ; \Gw2.006C80A0
+                //006E1351  \.  C3            RETN
+                //006E1352      CC            INT3
+                szSearchPattern = "C3CCCCCCCCCCCCCC8BD16880000000B9xxxxxxxxE8xxxxxxxxC3CC";
+
+                String _loginEmail = scanner.FindString(szSearchPattern, 16, 255);
 
                 _config.Save(ConfigurationSaveMode.Modified);
 

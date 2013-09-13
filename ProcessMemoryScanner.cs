@@ -23,6 +23,82 @@ namespace GW2SessionKey
             reader.ReadProcess = process;
         }
 
+        public Guid FindGuid(string szSearchPattern, UInt32 offset)
+        {
+            Guid retGuid = Guid.Empty;
+
+            byte[] response = Search(szSearchPattern, offset, (uint)Marshal.SizeOf(typeof(Guid)));
+
+            if (response != null)
+            {
+                retGuid = new Guid(response);
+            }
+
+            return retGuid;
+        }
+
+        public String FindString(string szSearchPattern, UInt32 offset, uint bytesToRead)
+        {
+            String retString = String.Empty;
+
+            byte[] response = Search(szSearchPattern, offset, bytesToRead);
+
+            if (response != null)
+            {
+                int count = Array.IndexOf<byte>(response, 0, 0);
+                if (count < 0) count = response.Length;
+                retString = Encoding.ASCII.GetString(response, 0, count);
+            }
+
+            return retString;
+        }
+
+        private byte[] Search(string szSearchPattern, UInt32 offset, uint bytesToRead)
+        {
+            ProcessMemoryReader.MEMORY_BASIC_INFORMATION info;
+            byte[] ret = null;
+
+            // Parse fingerprint
+            UInt32 len = (UInt32)(szSearchPattern.Length / 2);
+            ushort[] pPattern = new ushort[len];
+            UInt32 lResult = 0, retAddress = 0;
+
+            MakeSearchPattern(szSearchPattern, (ushort)szSearchPattern.Length, ref pPattern);
+
+            reader.OpenProcess();
+
+            uint bytesRead;
+            int p = 0;
+            for (info = reader.VirtualQueryEx((IntPtr)p, out bytesRead);
+                bytesRead > 0;
+                p += (int)info.RegionSize,
+                    info = reader.VirtualQueryEx((IntPtr)p, out bytesRead))
+            {
+                if (info.State == (uint)ProcessMemoryReader.memState.MEM_COMMIT &&
+                    (info.Type == (uint)ProcessMemoryReader.memType.MEM_IMAGE))
+                {
+                    int bytes_read;
+                    byte[] buffer;
+
+                    buffer = reader.ReadProcessMemory((IntPtr)p, info.RegionSize, out bytes_read);
+                    lResult = PatternSearch(buffer, (uint)bytes_read, pPattern, len);
+
+                    if (lResult > 0)
+                    {   // Found it!
+                        retAddress = BitConverter.ToUInt32(buffer, (int)(lResult + offset));
+
+                        byte[] response = reader.ReadProcessMemory((IntPtr)retAddress, bytesToRead, out bytes_read);
+                        ret = response;
+                        break;
+                    }
+                }
+            }
+
+            reader.CloseHandle();
+
+            return ret;
+        }
+
         //////////////////////////////////////////////////////////////////////
         // Pattern search algorithm written by Druttis.
         //
@@ -148,52 +224,6 @@ namespace GW2SessionKey
             }
             int lTemp = pValueHigh << 8;
             return (ushort)(pValueLow | lTemp);
-        }
-
-        public Guid FindGuid(string szSearchPattern, UInt32 offset)
-        {
-            ProcessMemoryReader.MEMORY_BASIC_INFORMATION info;
-            Guid retGuid = Guid.Empty;
-
-            // Parse fingerprint
-            UInt32 len = (UInt32)(szSearchPattern.Length / 2);
-            ushort[] pPattern = new ushort[len];
-            UInt32 lResult = 0, retAddress = 0;
-
-            MakeSearchPattern(szSearchPattern, (ushort)szSearchPattern.Length, ref pPattern);
-
-            reader.OpenProcess();
-
-            uint bytesRead;
-            int p = 0;
-            for (info = reader.VirtualQueryEx((IntPtr)p, out bytesRead);
-                bytesRead > 0;
-                p += (int)info.RegionSize,
-                    info = reader.VirtualQueryEx((IntPtr)p, out bytesRead))
-            {
-                if (info.State == (uint)ProcessMemoryReader.memState.MEM_COMMIT &&
-                    (info.Type == (uint)ProcessMemoryReader.memType.MEM_IMAGE))
-                {
-                    int bytes_read;
-                    byte[] buffer;
-
-                    buffer = reader.ReadProcessMemory((IntPtr)p, info.RegionSize, out bytes_read);
-                    lResult = PatternSearch(buffer, (uint)bytes_read, pPattern, len);
-
-                    if (lResult > 0)
-                    {   // Found it!
-                        retAddress = BitConverter.ToUInt32(buffer, (int)(lResult + offset));
-
-                        byte[] response = reader.ReadProcessMemory((IntPtr)retAddress, (uint)Marshal.SizeOf(typeof(Guid)), out bytes_read);
-                        retGuid = new Guid(response);
-                        break;
-                    }
-                }
-            }
-
-            reader.CloseHandle();
-
-            return retGuid;
         }
     }
 }

@@ -50,7 +50,7 @@ namespace GW2Miner.Engine
         private Object _MinAcquisitionCostLocked = new Object();
 
         //private static List<gw2dbItem> gw2dbItemList;
-        //private static List<gw2dbRecipe> gw2dbRecipeList;
+        //public static List<gw2dbRecipe> gw2dbRecipeList;
         public static Dictionary<int, gw2dbRecipe> createdIdToRecipe = new Dictionary<int, gw2dbRecipe>();
         private static Dictionary<int, gw2dbItem> dataIdToItem = new Dictionary<int, gw2dbItem>();
         private static bool gw2dbLoaded = false, gw2apiLoaded = false;
@@ -60,13 +60,13 @@ namespace GW2Miner.Engine
 
         static TradeWorker()
         {
-                _gw2apim = new Gw2apiManager();
-                LoadGw2API();
-                //T.Wait();
+            _gw2apim = new Gw2apiManager();
+            LoadGw2API();
+            //T.Wait();
 
-                _dbm = new Gw2dbManager();
-                LoadGw2DB();
-                //L.Wait();
+            _dbm = new Gw2dbManager();
+            LoadGw2DB();
+            //L.Wait();
         }
 
         public TradeWorker()
@@ -77,6 +77,7 @@ namespace GW2Miner.Engine
 
         private static async Task LoadGw2API()
         {
+
             gw2apiItemParser itemParser = new gw2apiItemParser();
             gw2api_dataIdToItem = itemParser.Parse(_gw2apim.RequestGw2apiItems());
 
@@ -404,6 +405,12 @@ namespace GW2Miner.Engine
                 ////recipe.CraftingCost.GoldCost = craftingCost;
                 return recipe.MinCraftingCost;
             }
+        }
+
+        public bool UseGW2SpidyForCraftingCost
+        {
+            get { return _useGW2Spidy; }
+            set { _useGW2Spidy = value; }
         }
 
         public RecipeCraftingCost MinAcquisitionCost(gw2dbRecipe recipe)
@@ -1348,6 +1355,43 @@ namespace GW2Miner.Engine
             }
         }
 
+        public async Task<gw2spidyRecipe> get_gw2spidy_recipe(int recipeId)
+        {
+            Stream recipeStream = await _sm.RequestGw2spidyRecipe(recipeId);
+
+            gw2spidyOneRecipeParser recipeParser = new gw2spidyOneRecipeParser();
+            gw2spidyRecipeResult recipeResult = recipeParser.Parse(recipeStream);
+            return recipeResult.Recipe;
+        }
+
+        public async Task<List<gw2spidyRecipe>> get_gw2spidy_recipes(GW2DBDisciplines discipline)
+        {
+            List<gw2spidyRecipe> allRecipeList = new List<gw2spidyRecipe>();
+            gw2spidyRecipeListParser recipeListParser = new gw2spidyRecipeListParser();
+            int currentPage = 1;
+
+            while (true)
+            {
+                try
+                {
+                    Stream recipesStream = await _sm.RequestGw2spidyAllRecipes(discipline, currentPage);
+                    gw2spidyRecipeList recipeList = recipeListParser.Parse(recipesStream);
+                    allRecipeList.AddRange(recipeList.Recipes);
+                    currentPage++;
+                    if (recipeList.Page == recipeList.LastPage)
+                    {
+                        break;
+                    }
+                }
+                catch(Exception e)
+                {
+                    break;
+                }
+            }
+
+            return allRecipeList;
+        }
+
         private string GetUpgradeName(int upgradeId)
         {
             string upgradeName = "";
@@ -1609,7 +1653,7 @@ namespace GW2Miner.Engine
         {
             get
             {
-                int recipeUpdatedTimeSpan = 5; // defaults to 5 mins
+                int recipeUpdatedTimeSpan = 15; // defaults to 15 mins
                 if (ConnectionManager._config.AppSettings.Settings["RecipeUpdatedTimeSpanInMinutes"] == null || 
                         !Int32.TryParse(ConnectionManager._config.AppSettings.Settings["RecipeUpdatedTimeSpanInMinutes"].Value, out recipeUpdatedTimeSpan))
                 {

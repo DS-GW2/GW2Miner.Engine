@@ -12,6 +12,8 @@ using System.Diagnostics;
 using System.Configuration;
 using GW2SessionKey;
 
+using GW2Miner.Domain;
+
 namespace GW2Miner.Engine
 {
     /// <summary>
@@ -22,6 +24,28 @@ namespace GW2Miner.Engine
         public async Task<Stream> RequestGw2spidyItem(int itemId)
         {
             String url = String.Format(@"http://www.gw2spidy.com/api/v0.9/json/item/{0}", itemId);
+
+            return await Request(url);
+        }
+
+        public async Task<Stream> RequestGw2spidyRecipe(int recipeId)
+        {
+            String url = String.Format(@"http://www.gw2spidy.com/api/v0.9/json/recipe/{0}", recipeId);
+
+            return await Request(url);
+        }
+
+        public async Task<Stream> RequestGw2spidyAllRecipes(GW2DBDisciplines discipline, int currentPage = 1)
+        {
+            int disciplineId;
+            string disciplineStr;
+            if (discipline == GW2DBDisciplines.Mystic_Forge) disciplineStr = "all";
+            else
+            {
+                disciplineId = (int) discipline;
+                disciplineStr = disciplineId.ToString();
+            }
+            String url = String.Format(@"http://www.gw2spidy.com/api/v0.9/json/recipes/{0}/{1}", disciplineStr, currentPage);
 
             return await Request(url);
         }
