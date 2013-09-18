@@ -179,6 +179,47 @@ namespace GW2Miner.Engine
         }
     }
 
+    public class gw2apiOneItemParser
+    {
+        public Object classLock = typeof(gw2apiOneItemParser);
+        public event EventHandler<NewParsedObjectEventArgs<Item>> ObjectParsed;
+
+        private void OnObjectParsed(Item newItem)
+        {
+            if (this.ObjectParsed != null)
+            {
+                this.ObjectParsed(this, new NewParsedObjectEventArgs<Item>(newItem));
+            }
+        }
+
+        public gw2apiItem Parse(Stream inputStream)
+        {
+            lock (classLock)
+            {
+                JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+                // Create a serializer
+                JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                using (StreamReader streamReader = new StreamReader(inputStream, new UTF8Encoding(false, true)))
+                {
+                    using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+                    {
+                        return ((gw2apiItem)serializer.Deserialize(jsonTextReader, typeof(gw2apiItem)));
+                        //foreach (gw2apiItem item in itemsDict.Values)
+                        //{
+                        //    if (item.RarityId >= RarityEnum.Masterwork && ((item.Flags & (GW2APIFlagsEnum.SoulBound_On_Use | GW2APIFlagsEnum.SoulBound_On_Acquire | 
+                        //                                                                    GW2APIFlagsEnum.Account_Bound)) == 0))
+                        //    {
+                        //        item.Flags |= GW2APIFlagsEnum.SoulBound_On_Use;
+                        //    }
+                        //}
+                    }
+                }
+            }
+        }
+    }
+
     public class gw2apiItemParser
     {
         public Object classLock = typeof(gw2apiItemParser);
@@ -216,6 +257,47 @@ namespace GW2Miner.Engine
                         //}
 
                         return itemsDict;
+                    }
+                }
+            }
+        }
+    }
+
+    public class gw2apiOneRecipeParser
+    {
+        public Object classLock = typeof(gw2apiOneRecipeParser);
+        public event EventHandler<NewParsedObjectEventArgs<Item>> ObjectParsed;
+
+        private void OnObjectParsed(Item newItem)
+        {
+            if (this.ObjectParsed != null)
+            {
+                this.ObjectParsed(this, new NewParsedObjectEventArgs<Item>(newItem));
+            }
+        }
+
+        public gw2apiOneRecipeParser Parse(Stream inputStream)
+        {
+            lock (classLock)
+            {
+                JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+                // Create a serializer
+                JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                using (StreamReader streamReader = new StreamReader(inputStream, new UTF8Encoding(false, true)))
+                {
+                    using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+                    {
+                        return ((gw2apiOneRecipeParser)serializer.Deserialize(jsonTextReader, typeof(gw2apiOneRecipeParser)));
+                        //foreach (gw2apiItem item in itemsDict.Values)
+                        //{
+                        //    if (item.RarityId >= RarityEnum.Masterwork && ((item.Flags & (GW2APIFlagsEnum.SoulBound_On_Use | GW2APIFlagsEnum.SoulBound_On_Acquire | 
+                        //                                                                    GW2APIFlagsEnum.Account_Bound)) == 0))
+                        //    {
+                        //        item.Flags |= GW2APIFlagsEnum.SoulBound_On_Use;
+                        //    }
+                        //}
                     }
                 }
             }
@@ -369,6 +451,9 @@ namespace GW2Miner.Engine
 
     public class ItemListParser
     {
+        public readonly string pastTransBuyFile = "pasttransbuy";
+        public readonly string pastTransSellFile = "pasttranssell";
+
         public Object classLock = typeof(ItemListParser);
         public event EventHandler<NewParsedObjectEventArgs<Item>> ObjectParsed;
 
@@ -405,6 +490,71 @@ namespace GW2Miner.Engine
                     }
                 }
             }
+        }
+
+        public void Write(List<Item> items, bool buy, string tag)
+        {
+            lock (classLock)
+            {
+                JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+                // Create a serializer
+                JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                string file = GetTransFileName(buy, tag);
+
+                using (StreamWriter streamWriter = new StreamWriter(file, false, Encoding.Unicode))
+                {
+                    using (JsonTextWriter jsonTextWriter = new JsonTextWriter(streamWriter))
+                    {
+                        serializer.Serialize(jsonTextWriter, items);
+                    }
+                }
+            }
+        }
+
+        public List<Item> Read(bool buy, string tag)
+        {
+            lock (classLock)
+            {
+                JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+                // Create a serializer
+                JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                string file = GetTransFileName(buy, tag);
+
+                if (File.Exists(file))
+                {
+                    using (StreamReader streamReader = new StreamReader(file, Encoding.Unicode))
+                    {
+                        using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+                        {
+                            return (List<Item>)serializer.Deserialize(jsonTextReader, typeof(List<Item>));
+                        }
+                    }
+                }
+                throw new FileNotFoundException("Past Items Transaction List JSON File Not Found!", file);
+            }
+        }
+
+        private string GetTransFileName(bool buy, string tag)
+        {
+            string path = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            path = System.IO.Path.Combine(path, "GW2TP");
+            if (!Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+            }
+            path = System.IO.Path.Combine(path, "Cache");
+            if (!Directory.Exists(path))
+            {
+                Directory.CreateDirectory(path);
+            }
+
+            String fileName = ((buy ? pastTransBuyFile : pastTransSellFile) + "_" + tag + ".json");
+            string file = string.Format("{0}\\{1}", path, fileName);
+            return file;
         }
     }
 }

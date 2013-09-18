@@ -36,8 +36,8 @@ namespace GW2Miner.Engine
         private String _loginURL = @"https://account.guildwars2.com/login?redirect_uri=http%3A%2F%2Ftradingpost-live.ncplatform.net%2Fauthenticate%3Fsource%3D%252F&game_code=gw2";
         //private String _loginURL = @"https://account.guildwars2.com/login?redirect_uri=http://tradingpost-live.ncplatform.net/authenticate?source=/me&game_code=gw2";
         //private String _loginURL = @"https://account.guildwars2.com/login?redirect_uri=http://tradingpost-live.ncplatform.net/authenticate?source=/me";
-        private String _accountEmail = "dspirit@gmail.com"; // - empty for now
-        private String _accountPassword = "thhedh11"; // - empty for now
+        private String _accountEmail = "user"; // - empty for now
+        private String _accountPassword = "password"; // - empty for now
         private bool _logined = false;
         private bool _loggingIn = false;
         private bool _useGameSessionKey = false;
@@ -84,7 +84,7 @@ namespace GW2Miner.Engine
 
         private ConnectionManager()
         {
-            string configFilePath = string.Format("{0}\\GW2TP.Config", Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments));
+            string configFilePath = string.Format("{0}\\GW2TP\\GW2TP.Config", Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
 
             // Map the new configuration file.
             ExeConfigurationFileMap configFileMap = new ExeConfigurationFileMap();
@@ -276,6 +276,16 @@ namespace GW2Miner.Engine
                 {
                     _fnGW2Logined -= value;
                 }
+            }
+        }
+
+        public string LoginEmail
+        {
+            get
+            {
+                GetLoginEmail();
+
+                return _loginEmail;
             }
         }
 
@@ -617,6 +627,36 @@ namespace GW2Miner.Engine
             _timeSlots.GetSlot();
         }
 
+        private void GetLoginEmail()
+        {
+            Process[] processes = Process.GetProcessesByName("Gw2");
+
+            if (processes.Length == 0) return;
+
+            Process p = processes[0];
+
+            ProcessMemoryScanner scanner = new ProcessMemoryScanner(p);
+
+            //TODO: Grab search pattern from config file instead
+            //CPU Disasm
+            //Address   Hex dump          Command                                  Comments
+            //006E133F      CC            INT3
+            //006E1340  /$  8BD1          MOV EDX,ECX
+            //006E1342  |.  68 80000000   PUSH 80                                  ; /Arg1 = 80
+            //006E1347  |.  B9 98A06601   MOV ECX,OFFSET 0166A098                  ; |ASCII "clientreport@arena.net"
+            //006E134C  |.  E8 4F6DFEFF   CALL 006C80A0                            ; \Gw2.006C80A0
+            //006E1351  \.  C3            RETN
+            //006E1352      CC            INT3
+            string szSearchPattern = "C3CCCCCCCCCCCCCC8BD16880000000B9xxxxxxxxE8xxxxxxxxC3CC";
+
+            string temp = scanner.FindString(szSearchPattern, 16, 255);
+
+            if (!string.IsNullOrEmpty(temp))
+            {
+                _loginEmail = temp;
+            }
+        }
+
         private void GetGameClientInfo()
         {
             lock (_classLock)
@@ -692,20 +732,7 @@ namespace GW2Miner.Engine
                 else
                     _config.AppSettings.Settings.Add("CharId", _charId);
 
-
-                //TODO: Grab search pattern from config file instead
-                //CPU Disasm
-                //Address   Hex dump          Command                                  Comments
-                //006E133F      CC            INT3
-                //006E1340  /$  8BD1          MOV EDX,ECX
-                //006E1342  |.  68 80000000   PUSH 80                                  ; /Arg1 = 80
-                //006E1347  |.  B9 98A06601   MOV ECX,OFFSET 0166A098                  ; |ASCII "clientreport@arena.net"
-                //006E134C  |.  E8 4F6DFEFF   CALL 006C80A0                            ; \Gw2.006C80A0
-                //006E1351  \.  C3            RETN
-                //006E1352      CC            INT3
-                szSearchPattern = "C3CCCCCCCCCCCCCC8BD16880000000B9xxxxxxxxE8xxxxxxxxC3CC";
-
-                String _loginEmail = scanner.FindString(szSearchPattern, 16, 255);
+                GetLoginEmail();
 
                 _config.Save(ConfigurationSaveMode.Modified);
 

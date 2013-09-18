@@ -9,8 +9,8 @@ using System.Text.RegularExpressions;
 using GW2Miner.Domain;
 using System.Diagnostics;
 using System.Configuration;
-using ServiceStack.Redis;
-using ServiceStack.Redis.Generic;
+//using ServiceStack.Redis;
+//using ServiceStack.Redis.Generic;
 
 namespace GW2Miner.Engine
 {
@@ -57,16 +57,17 @@ namespace GW2Miner.Engine
 
         public static Dictionary<int, gw2apiRecipe> gw2api_recipeIdToRecipe = new Dictionary<int, gw2apiRecipe>();
         private static Dictionary<int, gw2apiItem> gw2api_dataIdToItem = new Dictionary<int, gw2apiItem>();
+        public static Dictionary<int, gw2apiRecipe> gw2api_createdIdToRecipe = new Dictionary<int, gw2apiRecipe>();
 
         static TradeWorker()
         {
             _gw2apim = new Gw2apiManager();
             LoadGw2API();
-            //T.Wait();
+            //T.Wait();  
 
             _dbm = new Gw2dbManager();
             LoadGw2DB();
-            //L.Wait();
+            //L.Wait();          
         }
 
         public TradeWorker()
@@ -84,7 +85,311 @@ namespace GW2Miner.Engine
             gw2apiRecipeParser recipeParser = new gw2apiRecipeParser();
             gw2api_recipeIdToRecipe = recipeParser.Parse(_gw2apim.RequestGw2apiRecipes());
 
+            ProcessRecipes(gw2api_recipeIdToRecipe.Values.ToList<gw2apiRecipe>());
+
+            foreach (gw2apiItem item in gw2api_dataIdToItem.Values)
+            {
+                foreach (gw2apiRecipe recipe in item.Recipes)
+                {
+                    if (recipe != null)
+                    {
+                        foreach (gw2dbRecipe ingredient in recipe.IngredientRecipes)
+                        {
+                            ingredient.IngredientRecipes = BuildRecipeAPI(ingredient);
+                        }
+                    }
+                }
+            }
+
             gw2apiLoaded = true;
+        }
+
+        public static void ProcessRecipes(List<gw2apiRecipe> gw2apiRecipeList)
+        {
+            foreach (gw2apiRecipe recipe in gw2apiRecipeList)
+            {
+                if (recipe != null)
+                {
+                    foreach (gw2apiIngredient ingredient in recipe.Ingredients)
+                    {
+                        gw2dbRecipe ingredientRecipe = new gw2dbRecipe()
+                        {
+                            CreatedItemId = ingredient.Id,
+                            Quantity = ingredient.Quantity,
+                        };
+                        ingredientRecipe.CreatedDataId = ingredientRecipe.CreatedItemId;
+                        ingredientRecipe.Name = gw2api_dataIdToItem[ingredientRecipe.CreatedDataId].Name;
+
+                        recipe.IngredientRecipes.Add(ingredientRecipe); // Add 1 layer deep ingredient into each recipe
+                    }
+                    //gw2dbRecipe gw2dbItemRecipe = new gw2dbRecipe()
+                    //{
+                    //    CreatedDataId = recipe.CreatedDataId;
+                    //    Quantity 
+                    //};
+                    if (gw2api_dataIdToItem.ContainsKey(recipe.CreatedDataId))
+                    {
+                        gw2apiItem item = gw2api_dataIdToItem[recipe.CreatedDataId];
+                        recipe.Name = item.Name;
+                        item.Recipes.Add(recipe);
+                    }
+                    else if ((recipe.Flags & GW2APIRecipeFlags.Learned_From_Item) != 0)
+                    {
+                        // Output item not discovered by players yet?
+                        // Search for the recipe's recipe sheet item
+                        foreach (gw2apiItem apiItem in gw2api_dataIdToItem.Values)
+                        {
+                            if (apiItem.TypeId == TypeEnum.Consumable && apiItem.Consumable.SubTypeId == ConsumableSubTypeEnum.Unlock &&
+                                    apiItem.Consumable.UnlockType == GW2APIUnlockTypeEnum.Crafting_Recipe && apiItem.Consumable.RecipeId == recipe.Id)
+                            {
+                                recipe.Name = apiItem.Name.Remove(0, apiItem.Name.IndexOf(' '));
+                                break;
+                            }
+                        }
+                    }
+
+                    if (!gw2api_createdIdToRecipe.ContainsKey(recipe.CreatedDataId))
+                    {
+                        gw2api_createdIdToRecipe.Add(recipe.CreatedDataId, recipe);
+                    }
+                }
+            }
+        }
+
+        public static List<gw2dbRecipe> BuildRecipeAPI(gw2dbRecipe recipe)
+        {
+            if (gw2api_dataIdToItem.ContainsKey(recipe.CreatedDataId))
+            {
+                gw2apiItem item = gw2api_dataIdToItem[recipe.CreatedDataId];
+
+                foreach (gw2apiRecipe itemRecipe in item.Recipes)
+                {
+                    List<gw2dbRecipe> retList = new List<gw2dbRecipe>();
+                    foreach (gw2dbRecipe ingredient in itemRecipe.IngredientRecipes)
+                    {
+                        // Make a COPY of the ingredients before returning them
+                        gw2dbRecipe ingredientRecipe = new gw2dbRecipe()
+                        {
+                            CreatedDataId = ingredient.CreatedDataId,
+                            CreatedItemId = ingredient.Id,
+                            Quantity = (int)Math.Round((recipe.Quantity * ingredient.Quantity) / (double)itemRecipe.Quantity),
+                            Name = ingredient.Name,
+                        };
+                        if (ingredientRecipe.Quantity <= 0) ingredientRecipe.Quantity = 1;
+                        // Prevent stack overflow recursion
+                        if (ingredientRecipe.CreatedDataId != itemRecipe.CreatedDataId) ingredientRecipe.IngredientRecipes = BuildRecipeAPI(ingredientRecipe);
+                        retList.Add(ingredientRecipe);
+                    }
+                    return retList;
+                }
+            }
+
+            return null;
+        }
+
+        public RecipeCraftingCost MinCraftingCost(List<gw2apiRecipe> recipes)
+        {
+            RecipeCraftingCost minRecipeCost = new RecipeCraftingCost { GoldCost = int.MaxValue, KarmaCost = int.MaxValue, SkillPointsCost = float.MaxValue };
+            if (recipes != null)
+            {
+                foreach (gw2apiRecipe recipe in recipes)
+                {
+                    RecipeCraftingCost recipeCost = MinCraftingCost(recipe);
+                    if ((recipeCost.GoldCost < minRecipeCost.GoldCost) ||
+                            ((recipeCost.GoldCost == minRecipeCost.GoldCost) && (recipeCost.KarmaCost < minRecipeCost.KarmaCost)) ||
+                            ((recipeCost.GoldCost == minRecipeCost.GoldCost) && (recipeCost.KarmaCost == minRecipeCost.KarmaCost) &&
+                                (recipeCost.SkillPointsCost < minRecipeCost.SkillPointsCost)))
+                    {
+                        minRecipeCost = recipeCost;
+                    }
+                }
+            }
+            if (minRecipeCost.GoldCost == int.MaxValue)
+            {
+                minRecipeCost.GoldCost = minRecipeCost.KarmaCost = 0;
+                minRecipeCost.SkillPointsCost = 0.0f;
+            }
+            return minRecipeCost;
+        }
+
+        public RecipeCraftingCost MinCraftingCost(gw2apiRecipe recipe)
+        {
+            if (!gw2apiLoaded || !gw2dbLoaded || recipe == null || recipe.IngredientRecipes == null || recipe.IngredientRecipes.Count == 0)
+            {
+                return null;
+            }
+            else
+            {
+                if (recipe.MinCraftingCost.GoldCost > 0 || recipe.MinCraftingCost.KarmaCost > 0 || recipe.MinCraftingCost.SkillPointsCost > 0.0)
+                {
+                    DateTime lastUpdated = recipe.CraftingCostLastUpdated;
+                    TimeSpan span = DateTime.Now - lastUpdated;
+                    if (span.TotalMinutes <= this.RecipeUpdatedTimeSpanInMinutes)
+                    {
+                        return recipe.MinCraftingCost;
+                    }
+                }
+
+                recipe.MinCraftingCost.GoldCost = 0;
+                recipe.MinCraftingCost.KarmaCost = 0;
+                recipe.MinCraftingCost.SkillPointsCost = 0.0f;
+                foreach (gw2dbRecipe ingredient in recipe.IngredientRecipes)
+                {
+                    RecipeCraftingCost recipeCraftingCost = MinAcquisitionCost(ingredient);
+                    if (recipeCraftingCost != null)
+                    {
+                        recipe.MinCraftingCost.GoldCost = recipe.MinCraftingCost.GoldCost + recipeCraftingCost.GoldCost;
+                        recipe.MinCraftingCost.KarmaCost = recipe.MinCraftingCost.KarmaCost + recipeCraftingCost.KarmaCost;
+                        recipe.MinCraftingCost.SkillPointsCost = recipe.MinCraftingCost.SkillPointsCost + recipeCraftingCost.SkillPointsCost;
+                    }
+                }
+
+                recipe.CraftingCostLastUpdated = DateTime.Now;
+                ////recipe.CraftingCost.GoldCost = craftingCost;
+                return recipe.MinCraftingCost;
+            }
+        }
+
+        public RecipeCraftingCost MinAcquisitionCost(gw2apiRecipe recipe)
+        {
+            if (!gw2apiLoaded || !gw2dbLoaded || recipe == null) return new RecipeCraftingCost();
+
+            // Optimization: We only get the min sale unit price if the last price is at least 5 mins ago
+            lock (_MinAcquisitionCostLocked)
+            {
+                DateTime lastUpdated = recipe.TPLastUpdated;
+                if (gw2api_createdIdToRecipe.ContainsKey(recipe.CreatedDataId))
+                {
+                    lastUpdated = gw2api_createdIdToRecipe[recipe.CreatedDataId].TPLastUpdated;
+                }
+                else
+                {
+                    gw2api_createdIdToRecipe.Add(recipe.CreatedDataId, recipe);
+                }
+                TimeSpan span = DateTime.Now - lastUpdated;
+                if (span.TotalMinutes > this.RecipeUpdatedTimeSpanInMinutes)
+                {
+                    gw2spidyItem spidyItem = null;
+                    List<Item> items = null;
+                    try
+                    {
+                        if (_useGW2Spidy)
+                        {
+                            spidyItem = this.get_gw2spidy_item(recipe.CreatedDataId).Result;
+
+                            _gw2SpidyRetries = 0;  // reset counter
+
+                            recipe.CreatedItemMinSaleUnitPrice = spidyItem.MinSaleUnitPrice;
+                            recipe.CreatedItemMaxBuyUnitPrice = spidyItem.MaxOfferUnitPrice;
+                            recipe.CreatedItemVendorBuyUnitPrice = 0;
+                        }
+                    }
+                    catch
+                    {
+                    }
+
+                    if (spidyItem == null)
+                    {
+                        if (_useGW2Spidy)
+                        {
+                            _gw2SpidyRetries++; // increment counter for gw2spidy failures
+                            if (_gw2SpidyRetries >= MAX_GW2SPIDY_RETRIES) _useGW2Spidy = false; // give up and turn off gw2spidy
+                        }
+
+                        items = this.get_items(recipe.CreatedDataId).Result;
+
+                        if (items != null && items.Count > 0)
+                        {
+                            recipe.CreatedItemMinSaleUnitPrice = items[0].MinSaleUnitPrice;
+                            recipe.CreatedItemMaxBuyUnitPrice = items[0].MaxOfferUnitPrice;
+                            recipe.CreatedItemVendorBuyUnitPrice = items[0].VendorPrice * 8; // Doesn't matter as code after doesn't make use of this value now
+                        }
+                        else
+                        {
+                            recipe.CreatedItemMinSaleUnitPrice = 0;
+                            recipe.CreatedItemMaxBuyUnitPrice = 0;
+                            recipe.CreatedItemVendorBuyUnitPrice = 0;
+                        }
+                    }
+
+                    gw2api_createdIdToRecipe[recipe.CreatedDataId].CreatedItemMinSaleUnitPrice = recipe.CreatedItemMinSaleUnitPrice;
+                    gw2api_createdIdToRecipe[recipe.CreatedDataId].CreatedItemMaxBuyUnitPrice = recipe.CreatedItemMaxBuyUnitPrice;
+                    gw2api_createdIdToRecipe[recipe.CreatedDataId].CreatedItemVendorBuyUnitPrice = recipe.CreatedItemVendorBuyUnitPrice;
+
+                    recipe.TPLastUpdated = DateTime.Now;
+                    gw2api_createdIdToRecipe[recipe.CreatedDataId].TPLastUpdated = recipe.TPLastUpdated;
+                }
+                else
+                {
+                    recipe.CreatedItemMinSaleUnitPrice = gw2api_createdIdToRecipe[recipe.CreatedDataId].CreatedItemMinSaleUnitPrice;
+                    recipe.CreatedItemMaxBuyUnitPrice = gw2api_createdIdToRecipe[recipe.CreatedDataId].CreatedItemMaxBuyUnitPrice;
+                    recipe.CreatedItemVendorBuyUnitPrice = gw2api_createdIdToRecipe[recipe.CreatedDataId].CreatedItemVendorBuyUnitPrice;
+                }
+            }
+            int vendorUnitGoldCost = MinBulkAcquisitionUnitGoldCost(recipe.CreatedDataId);
+            bool buyableFromVendor;
+            if (vendorUnitGoldCost > 0)
+            {
+                recipe.CreatedItemVendorBuyUnitPrice = vendorUnitGoldCost;
+                buyableFromVendor = true;
+            }
+            else
+            {
+                buyableFromVendor = false;
+                //buyableFromVendor = (recipe.CreatedItemVendorBuyUnitPrice > 0 && recipe.CreatedItemMaxBuyUnitPrice <= recipe.CreatedItemVendorBuyUnitPrice); // HACK!  Till we get better data
+                //bool buyableFromVendor = (vendorCost > 0);
+            }
+
+            int buyCost = recipe.Quantity * recipe.CreatedItemMinSaleUnitPrice;
+            int vendorCost = recipe.Quantity * recipe.CreatedItemVendorBuyUnitPrice;
+            RecipeCraftingCost recipeCraftingCost = MinCraftingCost(recipe);
+            int craftingCost = (recipeCraftingCost != null) ? recipeCraftingCost.GoldCost : 0;
+
+            recipe.BestMethod = ObtainableMethods.Buy;
+            int minCost = buyCost;
+            if (buyableFromVendor && vendorCost < buyCost)
+            {
+                recipe.BestMethod = ObtainableMethods.Vendor;
+                minCost = vendorCost;
+            }
+            if (craftingCost > 0 && (craftingCost < minCost || minCost <= 0))
+            {
+                recipe.BestMethod = ObtainableMethods.Craft;
+                minCost = craftingCost;
+            }
+
+            RecipeCraftingCost recipeCost = new RecipeCraftingCost
+            {
+                GoldCost = minCost,
+                KarmaCost = (recipeCraftingCost != null && recipe.BestMethod == ObtainableMethods.Craft) ? recipeCraftingCost.KarmaCost : 0,
+                SkillPointsCost = (recipeCraftingCost != null && recipe.BestMethod == ObtainableMethods.Craft) ? recipeCraftingCost.SkillPointsCost : 0.0f
+            };
+
+            if (minCost <= 0)
+            {
+                int karmaCost = MinBulkAcquisitionUnitKarmaCost(recipe.CreatedDataId);
+                if (karmaCost > 0)
+                {
+                    recipe.BestMethod = ObtainableMethods.Karma;
+                    recipe.CreatedItemMinKarmaUnitPrice = karmaCost;
+                    recipeCost.KarmaCost = recipeCost.KarmaCost + (recipe.Quantity * recipe.CreatedItemMinKarmaUnitPrice);
+                    minCost = 0; // karma is 0 gold
+                }
+                else
+                {
+                    float skillPointsCost = MinBulkAcquisitionUnitSkillPointCost(recipe.CreatedDataId);
+                    if (skillPointsCost > 0.0f)
+                    {
+                        recipe.BestMethod = ObtainableMethods.SkillPoints;
+                        recipe.CreatedItemMinSkillPointsUnitPrice = skillPointsCost;
+                        recipeCost.SkillPointsCost = recipeCost.SkillPointsCost + (recipe.Quantity * recipe.CreatedItemMinSkillPointsUnitPrice);
+                        minCost = 0; // skill point is 0 gold
+                    }
+                    else recipe.BestMethod = ObtainableMethods.Unknown;
+                }
+            }
+
+            return recipeCost;
         }
 
         public bool GW2APILoaded
@@ -101,7 +406,23 @@ namespace GW2Miner.Engine
             {
                 return gw2api_dataIdToItem[dataId];
             }
-            return null;
+            else // try to obtain it from the ArenaNet on the internet as perhaps our database is alittle outdated
+            {
+                try
+                {
+                    Stream itemStream = _gw2apim.RequestGw2apiItem(dataId).Result;
+
+                    gw2apiOneItemParser itemParser = new gw2apiOneItemParser();
+                    gw2apiItem item = itemParser.Parse(itemStream);
+                    gw2api_dataIdToItem.Add(item.Id, item); // Update our own database
+
+                    return item;
+                }
+                catch (Exception e)
+                {
+                    return null;
+                }
+            }
         }
 
         public int GW2APIGetItemUpgrade(int dataId)
@@ -163,11 +484,18 @@ namespace GW2Miner.Engine
                 if (item != null)
                 {
                     var index = gw2dbItemList.FindIndex(x => x.data_Id == item.data_Id);
-                    // Override everything EXCEPT for the Id, because the Id number may change with each 
-                    // release of items.json
-                    int temp = gw2dbItemList[index].Id;
-                    gw2dbItemList[index] = item;
-                    gw2dbItemList[index].Id = temp;
+                    if (index >= 0)
+                    {
+                        // Override everything EXCEPT for the Id, because the Id number may change with each 
+                        // release of items.json
+                        int temp = gw2dbItemList[index].Id;
+                        gw2dbItemList[index] = item;
+                        gw2dbItemList[index].Id = temp;
+                    }
+                    else
+                    {
+                        gw2dbItemList.Add(item);
+                    }
                 }
             }
 
@@ -334,7 +662,7 @@ namespace GW2Miner.Engine
         {
             foreach (gw2apiItem apiItem in gw2api_dataIdToItem.Values)
             {
-                if (apiItem.TypeId == TypeEnum.Consumable && apiItem.Consumable.SubTypeId == ConsumableSubTypeEnum.Unlock && 
+                if (apiItem.TypeId == TypeEnum.Consumable && apiItem.Consumable.SubTypeId == ConsumableSubTypeEnum.Unlock &&
                         apiItem.Consumable.UnlockType == GW2APIUnlockTypeEnum.Crafting_Recipe && apiItem.Consumable.RecipeId == recipeId)
                 {
                     return GetGW2DBItem(apiItem.Id);
@@ -353,8 +681,8 @@ namespace GW2Miner.Engine
                 {
                     RecipeCraftingCost recipeCost = MinCraftingCost(recipe);
                     if ((recipeCost.GoldCost < minRecipeCost.GoldCost) ||
-                            ((recipeCost.GoldCost == minRecipeCost.GoldCost) && (recipeCost.KarmaCost < minRecipeCost.KarmaCost)) || 
-                            ((recipeCost.GoldCost == minRecipeCost.GoldCost) && (recipeCost.KarmaCost == minRecipeCost.KarmaCost) && 
+                            ((recipeCost.GoldCost == minRecipeCost.GoldCost) && (recipeCost.KarmaCost < minRecipeCost.KarmaCost)) ||
+                            ((recipeCost.GoldCost == minRecipeCost.GoldCost) && (recipeCost.KarmaCost == minRecipeCost.KarmaCost) &&
                                 (recipeCost.SkillPointsCost < minRecipeCost.SkillPointsCost)))
                     {
                         minRecipeCost = recipeCost;
@@ -374,7 +702,7 @@ namespace GW2Miner.Engine
             if (!gw2dbLoaded || recipe == null || recipe.IngredientRecipes == null || recipe.IngredientRecipes.Count == 0)
             {
                 return null;
-            }           
+            }
             else
             {
                 if (recipe.MinCraftingCost.GoldCost > 0 || recipe.MinCraftingCost.KarmaCost > 0 || recipe.MinCraftingCost.SkillPointsCost > 0.0)
@@ -521,8 +849,12 @@ namespace GW2Miner.Engine
                 minCost = craftingCost;
             }
 
-            RecipeCraftingCost recipeCost = new RecipeCraftingCost { GoldCost = minCost, KarmaCost = (recipeCraftingCost != null && recipe.BestMethod == ObtainableMethods.Craft) ? recipeCraftingCost.KarmaCost : 0,
-                                                                     SkillPointsCost = (recipeCraftingCost != null && recipe.BestMethod == ObtainableMethods.Craft) ? recipeCraftingCost.SkillPointsCost : 0.0f };
+            RecipeCraftingCost recipeCost = new RecipeCraftingCost
+            {
+                GoldCost = minCost,
+                KarmaCost = (recipeCraftingCost != null && recipe.BestMethod == ObtainableMethods.Craft) ? recipeCraftingCost.KarmaCost : 0,
+                SkillPointsCost = (recipeCraftingCost != null && recipe.BestMethod == ObtainableMethods.Craft) ? recipeCraftingCost.SkillPointsCost : 0.0f
+            };
 
             if (minCost <= 0)
             {
@@ -546,13 +878,13 @@ namespace GW2Miner.Engine
                     }
                     else recipe.BestMethod = ObtainableMethods.Unknown;
                 }
-            }            
+            }
 
             return recipeCost;
         }
 
-        public async Task<List<Item>> search_items(string text = "", bool allPages = true, TypeEnum type = TypeEnum.All, int subType = -1, RarityEnum rarity = RarityEnum.All, 
-                                                    int levelMin = 0, int levelMax = 80, bool removeUnavailable = true, int offset = 1, int count = 10, string orderBy = "", 
+        public async Task<List<Item>> search_items(string text = "", bool allPages = true, TypeEnum type = TypeEnum.All, int subType = -1, RarityEnum rarity = RarityEnum.All,
+                                                    int levelMin = 0, int levelMax = 80, bool removeUnavailable = true, int offset = 1, int count = 10, string orderBy = "",
                                                     bool sortDescending = false)
         {
             if (!TradeWorker.gettingSessionKey)
@@ -720,7 +1052,7 @@ namespace GW2Miner.Engine
                     switch (item.TypeId)
                     {
                         case TypeEnum.Weapon:
-                            item.SubTypeId = (int) apiItem.Weapon.SubTypeId;
+                            item.SubTypeId = (int)apiItem.Weapon.SubTypeId;
                             item.MinPower = apiItem.Weapon.MinPower;
                             item.MaxPower = apiItem.Weapon.MaxPower;
                             item.Defense = apiItem.Weapon.Defense;
@@ -728,40 +1060,40 @@ namespace GW2Miner.Engine
                             item.DamageType = apiItem.Weapon.DamageType;
                             if (apiItem.Weapon.InfixUpgrade != null) item.Stats = GW2APIInfixUpgradeAttributeToGW2DBStats(apiItem.Weapon.InfixUpgrade.Attributes);
                             break;
-                        
+
                         case TypeEnum.Upgrade_Component:
-                            item.SubTypeId = (int) apiItem.UpgradeComponent.SubTypeId;
+                            item.SubTypeId = (int)apiItem.UpgradeComponent.SubTypeId;
                             if (apiItem.UpgradeComponent.InfixUpgrade != null) item.Stats = GW2APIInfixUpgradeAttributeToGW2DBStats(apiItem.UpgradeComponent.InfixUpgrade.Attributes);
                             break;
 
                         case TypeEnum.Trinket:
-                            item.SubTypeId = (int) apiItem.Trinket.SubTypeId;
+                            item.SubTypeId = (int)apiItem.Trinket.SubTypeId;
                             item.UpgradeId = apiItem.Trinket.UpgradeId;
                             if (apiItem.Trinket.InfixUpgrade != null) item.Stats = GW2APIInfixUpgradeAttributeToGW2DBStats(apiItem.Trinket.InfixUpgrade.Attributes);
                             break;
 
                         case TypeEnum.Tool:
-                            item.SubTypeId = (int) apiItem.Tool.SubTypeId;
+                            item.SubTypeId = (int)apiItem.Tool.SubTypeId;
                             break;
 
                         case TypeEnum.Gizmo:
-                            item.SubTypeId = (int) apiItem.Gizmo.SubTypeId;
+                            item.SubTypeId = (int)apiItem.Gizmo.SubTypeId;
                             break;
 
                         case TypeEnum.Gathering:
-                            item.SubTypeId = (int) apiItem.Gathering.SubTypeId;
+                            item.SubTypeId = (int)apiItem.Gathering.SubTypeId;
                             break;
 
                         case TypeEnum.Container:
-                            item.SubTypeId = (int) apiItem.Container.SubTypeId;
+                            item.SubTypeId = (int)apiItem.Container.SubTypeId;
                             break;
 
                         case TypeEnum.Consumable:
-                            item.SubTypeId = (int) apiItem.Consumable.SubTypeId;
+                            item.SubTypeId = (int)apiItem.Consumable.SubTypeId;
                             break;
 
                         case TypeEnum.Armor:
-                            item.SubTypeId = (int) apiItem.Armor.SubTypeId;
+                            item.SubTypeId = (int)apiItem.Armor.SubTypeId;
                             item.ArmorWeightType = apiItem.Armor.ArmorWeightType;
                             item.Defense = apiItem.Armor.Defense;
                             item.UpgradeId = apiItem.Armor.UpgradeId;
@@ -1383,7 +1715,7 @@ namespace GW2Miner.Engine
                         break;
                     }
                 }
-                catch(Exception e)
+                catch (Exception e)
                 {
                     break;
                 }
@@ -1593,6 +1925,7 @@ namespace GW2Miner.Engine
             ItemListParser itemParser = new ItemListParser();
             MyItemList allItemList;
             List<Item> retItemList;
+
             lock (classLock)
             {
                 allItemList = itemParser.Parse(itemStreams);
@@ -1601,28 +1934,89 @@ namespace GW2Miner.Engine
                 if (allItemList.args != null) UpdateArgs(ref this.transArgs, allItemList.args.Offset, allItemList.args.Count, allItemList.Total); // Record the last search max count
             }
 
+            int listSize = retItemList.Count;
+
+            List<Item> oldList = new List<Item>();
+            List<Item> mergedList;
             if (allPages)
             {
-                int listCount = allItemList.Total;
-                int listSize = retItemList.Count;
+                count = int.MaxValue; // Set an impossibly large value if allPages are specified so that algo would look at itemList.Total instead
 
-                while ((listCount - origOffset + 1) > listSize)
+                // If past == true, attempt to read from saved JSON file instead first
+                if (past && origOffset == 1)
                 {
-                    int offset = listSize + origOffset;
-                    // TODO: If past == true, attempt to read from saved JSON file instead first
-                    itemStreams = await _cm.RequestMyBuysSells(buy, false, offset, past, listCount - listSize - origOffset + 1);
-                    lock (classLock)
+                    try
                     {
-                        MyItemList itemList = itemParser.Parse(itemStreams);
-                        UpdateArgs(ref this.transArgs, -1, this.transArgs.count + itemList.Items.Count, allItemList.Total); // Record the last search max count
-                        listCount = itemList.Total;
-                        retItemList.AddRange(itemList.Items);
-                        listSize = retItemList.Count;
+                        oldList = itemParser.Read(buy, _cm.LoginEmail);
+                    }
+                    catch
+                    {
+                        // Probably file does not exist
+                    }
+
+                    if (oldList.Count > 0)
+                    {
+                        if (MergeLists(oldList, retItemList, out mergedList))
+                        {
+                            retItemList = mergedList;
+                            listSize = retItemList.Count;
+                        }
                     }
                 }
             }
 
+            int listCount = Math.Min(count, allItemList.Total);
+
+            while ((listCount - origOffset + 1) > listSize)
+            {
+                int offset = listSize + origOffset;
+
+                itemStreams = await _cm.RequestMyBuysSells(buy, false, offset, past, listCount - listSize - origOffset + 1);
+                lock (classLock)
+                {
+                    MyItemList itemList = itemParser.Parse(itemStreams);
+                    UpdateArgs(ref this.transArgs, -1, this.transArgs.count + itemList.Items.Count, allItemList.Total); // Record the last search max count
+                    listCount = Math.Min(count, itemList.Total);
+                    retItemList.AddRange(itemList.Items);
+                    listSize = retItemList.Count;
+
+                    if (allPages && past && oldList.Count > 0)
+                    {
+                        if (MergeLists(oldList, retItemList, out mergedList))
+                        {
+                            retItemList = mergedList;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (allPages && past && (origOffset == 1) && ((oldList.Count == 0) || (oldList[0] != retItemList[0])))
+            {
+                itemParser.Write(retItemList, buy, _cm.LoginEmail);
+            }
+
             return retItemList;
+        }
+
+        private bool MergeLists(List<Item> oldList, List<Item> newList, out List<Item> mergedList)
+        {
+            if (oldList.Count == 0)
+            {
+                mergedList = newList;
+                return true;
+            }
+
+            if (newList.Count == 0)
+            {
+                mergedList = oldList;
+                return true;
+            }
+
+            mergedList = newList.Union(oldList).ToList();
+
+            int index = newList.FindIndex(x => oldList[0].Id == x.Id);
+            return (index >= 0);
         }
 
         private async Task<List<ItemBuySellListingItem>> get_buy_sell_listings(bool buy, int item_id)
@@ -1647,14 +2041,14 @@ namespace GW2Miner.Engine
               (retString, HTML_TAG_PATTERN, string.Empty);
 
             return retString;
-         }
+        }
 
         private double RecipeUpdatedTimeSpanInMinutes
         {
             get
             {
                 int recipeUpdatedTimeSpan = 15; // defaults to 15 mins
-                if (ConnectionManager._config.AppSettings.Settings["RecipeUpdatedTimeSpanInMinutes"] == null || 
+                if (ConnectionManager._config.AppSettings.Settings["RecipeUpdatedTimeSpanInMinutes"] == null ||
                         !Int32.TryParse(ConnectionManager._config.AppSettings.Settings["RecipeUpdatedTimeSpanInMinutes"].Value, out recipeUpdatedTimeSpan))
                 {
                     ConnectionManager._config.AppSettings.Settings.Add("RecipeUpdatedTimeSpanInMinutes", recipeUpdatedTimeSpan.ToString());
