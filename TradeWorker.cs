@@ -326,7 +326,7 @@ namespace GW2Miner.Engine
                     recipe.CreatedItemVendorBuyUnitPrice = gw2api_createdIdToRecipe[recipe.CreatedDataId].CreatedItemVendorBuyUnitPrice;
                 }
             }
-            int vendorUnitGoldCost = MinBulkAcquisitionUnitGoldCost(recipe.CreatedDataId);
+            float vendorUnitGoldCost = MinBulkAcquisitionUnitGoldCost(recipe.CreatedDataId);
             bool buyableFromVendor;
             if (vendorUnitGoldCost > 0)
             {
@@ -341,7 +341,7 @@ namespace GW2Miner.Engine
             }
 
             int buyCost = recipe.Quantity * recipe.CreatedItemMinSaleUnitPrice;
-            int vendorCost = recipe.Quantity * recipe.CreatedItemVendorBuyUnitPrice;
+            int vendorCost = (int)Math.Round(recipe.Quantity * recipe.CreatedItemVendorBuyUnitPrice);
             RecipeCraftingCost recipeCraftingCost = MinCraftingCost(recipe);
             int craftingCost = (recipeCraftingCost != null) ? recipeCraftingCost.GoldCost : 0;
 
@@ -817,9 +817,9 @@ namespace GW2Miner.Engine
                     recipe.CreatedItemVendorBuyUnitPrice = CreatedIdToRecipe[recipe.CreatedDataId].CreatedItemVendorBuyUnitPrice;
                 }
             }
-            int vendorUnitGoldCost = MinBulkAcquisitionUnitGoldCost(recipe.CreatedDataId);
+            float vendorUnitGoldCost = MinBulkAcquisitionUnitGoldCost(recipe.CreatedDataId);
             bool buyableFromVendor;
-            if (vendorUnitGoldCost > 0)
+            if (vendorUnitGoldCost > 0.0)
             {
                 recipe.CreatedItemVendorBuyUnitPrice = vendorUnitGoldCost;
                 buyableFromVendor = true;
@@ -832,7 +832,7 @@ namespace GW2Miner.Engine
             }
 
             int buyCost = recipe.Quantity * recipe.CreatedItemMinSaleUnitPrice;
-            int vendorCost = recipe.Quantity * recipe.CreatedItemVendorBuyUnitPrice;
+            int vendorCost = (int)Math.Round(recipe.Quantity * recipe.CreatedItemVendorBuyUnitPrice);
             RecipeCraftingCost recipeCraftingCost = MinCraftingCost(recipe);
             int craftingCost = (recipeCraftingCost != null) ? recipeCraftingCost.GoldCost : 0;
 
@@ -2151,25 +2151,25 @@ namespace GW2Miner.Engine
             return minKarma;
         }
 
-        private int MinAcquisitionGoldCost(gw2dbItem item)
+        private float MinAcquisitionGoldCost(gw2dbItem item)
         {
             if (item == null)
             {
                 return 0;
             }
 
-            int minGold = int.MaxValue;
+            float minGold = float.MaxValue;
             foreach (gw2dbSoldBy soldBy in item.SoldBy)
             {
                 if (soldBy.GoldCost > 0 && soldBy.GoldCost < minGold) minGold = soldBy.GoldCost;
             }
-            if (minGold == int.MaxValue) minGold = 0;
+            if (minGold == float.MaxValue) minGold = 0;
             return minGold;
         }
 
-        private int MinBulkAcquisitionUnitGoldCost(int dataId)
+        private float MinBulkAcquisitionUnitGoldCost(int dataId)
         {
-            int minGold;
+            float minGold;
             minGold = MinAcquisitionGoldCost(GetGW2DBItem(dataId));
             if (minGold == 0)
             {
