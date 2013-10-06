@@ -1241,14 +1241,16 @@ namespace GW2Miner.Engine
             if (!TradeWorker.gettingSessionKey)
             {
                 GemPriceTP retGemPrices = new GemPriceTP();
-                Stream gemPriceStreams = await _cm.RequestGemPrice(10000000, 100000);
 
-                GemPriceParser goldGemPriceParser = new GemPriceParser();
+                Stream gemPriceStreams = await _cm.RequestGoldToGemsPrice(10000000);
+                GemPriceListGoldToGemsParser goldGemPriceParser = new GemPriceListGoldToGemsParser();
+                GemPriceList2GoldToGems goldGemPrice = goldGemPriceParser.Parse(gemPriceStreams);
+                retGemPrices.gold_to_gem = (1000000000 / goldGemPrice.GemPrice4GoldToGems.quantity);
 
-                GemPriceList2 gemPrice = goldGemPriceParser.Parse(gemPriceStreams);
-
-                retGemPrices.gem_to_gold = gemPrice.GemPrice4GemsToGold.quantity / 1000;
-                retGemPrices.gold_to_gem = (1000000000 / gemPrice.GemPrice4GoldToGems.quantity);
+                gemPriceStreams = await _cm.RequestGemsToGoldPrice(100000);
+                GemPriceListGemsToGoldParser gemGoldPriceParser = new GemPriceListGemsToGoldParser();
+                GemPriceList2GemsToGold gemGoldPrice = gemGoldPriceParser.Parse(gemPriceStreams);
+                retGemPrices.gem_to_gold = gemGoldPrice.GemPrice4GemsToGold.quantity / 1000;
 
                 return retGemPrices;
             }
@@ -1567,7 +1569,9 @@ namespace GW2Miner.Engine
                 }
                 else
                 {
-                    double BLSalvageCost = BlackLionKitSalvageCost;
+                    // TODO: BUG: Ignoring BL Salvage Cost for now
+                    //double BLSalvageCost = BlackLionKitSalvageCost;
+                    double BLSalvageCost = 0;
                     return Math.Max(Math.Max(item.VendorPrice, (int)(0.85 * mySellPrice)),
                                      Math.Max((int)(0.85 * GetMySellPrice(sellItemList, upgrade, out iAmSelling, out underCut, out myItemOnSale) - BLSalvageCost), upgrade.VendorPrice - (int)BLSalvageCost));
                 }

@@ -193,13 +193,28 @@ namespace GW2Miner.Engine
             return await Request(url, referrer, relogin);
         }
 
-        public async Task<Stream> RequestGemPrice(int coinQuantity, int gemQuantity)
+        public async Task<Stream> RequestGoldToGemsPrice(int coinQuantity)
         {
             String url;
             Uri referrer;
             lock (_classLock)
             {
-                url = String.Format(@"https://exchange-live.ncplatform.net/ws/rates.json?id={0}&coins={1}&gems={2}", _charId, coinQuantity, gemQuantity);
+                url = String.Format(@"https://exchange-live.ncplatform.net/ws/rates.json?id={0}&coins={1}", _charId, coinQuantity);
+                referrer = new Uri(@"https://exchange-live.ncplatform.net/");
+
+                UseGameSessionKey = true;
+            }
+
+            return await Request(url, referrer, false);
+        }
+
+        public async Task<Stream> RequestGemsToGoldPrice(int gemQuantity)
+        {
+            String url;
+            Uri referrer;
+            lock (_classLock)
+            {
+                url = String.Format(@"https://exchange-live.ncplatform.net/ws/rates.json?id={0}&gems={1}", _charId, gemQuantity);
                 referrer = new Uri(@"https://exchange-live.ncplatform.net/");
 
                 UseGameSessionKey = true;
@@ -763,7 +778,7 @@ namespace GW2Miner.Engine
                 try
                 {
                     needToWait = false;
-                    Task t = RequestGemPrice(10000, 100);
+                    Task t = RequestGemsToGoldPrice(10000);
                     t.Wait();
                 }
                 catch (Exception)
