@@ -21,16 +21,32 @@ namespace GW2Miner.Engine
     /// </summary>
     public class Gw2spidyManager
     {
+        static readonly String API_VERSION = "v0.9";
+
+        public async Task<Stream> RequestGw2spidyGemPrice()
+        {
+            String url = String.Format(@"http://www.gw2spidy.com/api/{0}/json/gem-price", API_VERSION);
+
+            return await Request(url);
+        }
+
+        public async Task<Stream> RequestGw2spidyItemListings(int itemId, bool buy, int currentPage = 1)
+        {
+            String url = String.Format(@"http://www.gw2spidy.com/api/{0}/json/listings/{1}/{2}/{3}", API_VERSION, itemId, (buy ? "buy" : "sell"), currentPage);
+
+            return await Request(url);
+        }
+
         public async Task<Stream> RequestGw2spidyItem(int itemId)
         {
-            String url = String.Format(@"http://www.gw2spidy.com/api/v0.9/json/item/{0}", itemId);
+            String url = String.Format(@"http://www.gw2spidy.com/api/{0}/json/item/{1}", API_VERSION, itemId);
 
             return await Request(url);
         }
 
         public async Task<Stream> RequestGw2spidyRecipe(int recipeId)
         {
-            String url = String.Format(@"http://www.gw2spidy.com/api/v0.9/json/recipe/{0}", recipeId);
+            String url = String.Format(@"http://www.gw2spidy.com/api/{0}/json/recipe/{1}", API_VERSION, recipeId);
 
             return await Request(url);
         }
@@ -45,7 +61,7 @@ namespace GW2Miner.Engine
                 disciplineId = (int) discipline;
                 disciplineStr = disciplineId.ToString();
             }
-            String url = String.Format(@"http://www.gw2spidy.com/api/v0.9/json/recipes/{0}/{1}", disciplineStr, currentPage);
+            String url = String.Format(@"http://www.gw2spidy.com/api/{0}/json/recipes/{1}/{2}", API_VERSION, disciplineStr, currentPage);
 
             return await Request(url);
         }
