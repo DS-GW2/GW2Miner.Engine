@@ -22,6 +22,42 @@ namespace GW2Miner.Engine
             }
         }
 
+        //public List<ItemBuySellListingItem> Parse(Stream inputStream, bool getBuyListing)
+        //{
+        //    JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+        //    // Create a serializer
+        //    JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+        //    using (StreamReader streamReader = new StreamReader(inputStream, new UTF8Encoding(false, true)))
+        //    {
+        //        using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+        //        {
+        //            //jsonTextReader.DateParseHandling = DateParseHandling.None;
+        //            return (getBuyListing ? ((ItemBuySellListingList)serializer.Deserialize(jsonTextReader, typeof(ItemBuySellListingList))).Listings.BuyListings : 
+        //                ((ItemBuySellListingList)serializer.Deserialize(jsonTextReader, typeof(ItemBuySellListingList))).Listings.SellListings);
+        //        }
+        //    }
+        //}
+
+        public List<ItemBuySellListingItem> ParseOneItem(Stream inputStream, bool getBuyListing)
+        {
+            JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+            // Create a serializer
+            JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+            using (StreamReader streamReader = new StreamReader(inputStream, new UTF8Encoding(false, true)))
+            {
+                using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+                {
+                    //jsonTextReader.DateParseHandling = DateParseHandling.None;
+                    return (getBuyListing ? ((ItemBuySellListing)serializer.Deserialize(jsonTextReader, typeof(ItemBuySellListing))).BuyListings :
+                        ((ItemBuySellListing)serializer.Deserialize(jsonTextReader, typeof(ItemBuySellListing))).SellListings);
+                }
+            }
+        }
+
         public List<ItemBuySellListingItem> Parse(Stream inputStream, bool getBuyListing)
         {
             JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
@@ -34,8 +70,17 @@ namespace GW2Miner.Engine
                 using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
                 {
                     //jsonTextReader.DateParseHandling = DateParseHandling.None;
-                    return (getBuyListing ? ((ItemBuySellListingList)serializer.Deserialize(jsonTextReader, typeof(ItemBuySellListingList))).Listings.BuyListings : 
-                        ((ItemBuySellListingList)serializer.Deserialize(jsonTextReader, typeof(ItemBuySellListingList))).Listings.SellListings);
+
+                    List<ItemBuySellListing> allList = (List<ItemBuySellListing>)serializer.Deserialize(jsonTextReader, typeof(List<ItemBuySellListing>));
+                    List<ItemBuySellListingItem> retList = new List<ItemBuySellListingItem>();
+                    if (allList != null)
+                    {
+                        foreach (ItemBuySellListing item in allList)
+                        {
+                            retList.AddRange(getBuyListing ? item.BuyListings : item.SellListings);
+                        }
+                    }
+                    return (retList);
                 }
             }
         }

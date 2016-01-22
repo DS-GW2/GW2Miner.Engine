@@ -23,7 +23,7 @@ namespace GW2Miner.Engine
             }
         }
 
-        public ItemList Parse(Stream inputStream)
+        public List<ItemListItem> Parse(Stream inputStream)
         {
             lock (classLock)
             {
@@ -36,7 +36,26 @@ namespace GW2Miner.Engine
                 {
                     using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
                     {
-                        return ((ItemList)serializer.Deserialize(jsonTextReader, typeof(ItemList)));
+                        return ((List<ItemListItem>)serializer.Deserialize(jsonTextReader, typeof(List<ItemListItem>)));
+                    }
+                }
+            }
+        }
+
+        public ItemListItem ParseOneItem(Stream inputStream)
+        {
+            lock (classLock)
+            {
+                JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+                // Create a serializer
+                JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                using (StreamReader streamReader = new StreamReader(inputStream, new UTF8Encoding(false, true)))
+                {
+                    using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+                    {
+                        return ((ItemListItem)serializer.Deserialize(jsonTextReader, typeof(ItemListItem)));
                     }
                 }
             }
@@ -105,6 +124,40 @@ namespace GW2Miner.Engine
                     {
                         //jsonTextReader.DateParseHandling = DateParseHandling.None;
                         return ((gw2spidyItemListings)serializer.Deserialize(jsonTextReader, typeof(gw2spidyItemListings)));
+                    }
+                }
+            }
+        }
+    }
+
+    public class gw2spidyFullItemListParser
+    {
+        public Object classLock = typeof(gw2spidyFullItemListParser);
+        public event EventHandler<NewParsedObjectEventArgs<Item>> ObjectParsed;
+
+        private void OnObjectParsed(Item newItem)
+        {
+            if (this.ObjectParsed != null)
+            {
+                this.ObjectParsed(this, new NewParsedObjectEventArgs<Item>(newItem));
+            }
+        }
+
+        public gw2spidyFullItemList Parse(Stream inputStream)
+        {
+            lock (classLock)
+            {
+                JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings();
+
+                // Create a serializer
+                JsonSerializer serializer = JsonSerializer.Create(_jsonSerializerSettings);
+
+                using (StreamReader streamReader = new StreamReader(inputStream, new UTF8Encoding(false, true)))
+                {
+                    using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
+                    {
+                        //jsonTextReader.DateParseHandling = DateParseHandling.None;
+                        return ((gw2spidyFullItemList)serializer.Deserialize(jsonTextReader, typeof(gw2spidyFullItemList)));
                     }
                 }
             }

@@ -12,7 +12,7 @@ namespace GW2Miner.Engine
     public class GemPriceListGoldToGemsParser
     {
         public Object classLock = typeof(GemPriceListGoldToGemsParser);
-        public GemPriceList2GoldToGems Parse(Stream inputStream)
+        public GemPrice Parse(Stream inputStream)
         {
             lock (classLock)
             {
@@ -26,8 +26,9 @@ namespace GW2Miner.Engine
                     using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
                     {
                         //jsonTextReader.DateParseHandling = DateParseHandling.None;
-                        GemPriceListGoldToGems list = (GemPriceListGoldToGems)serializer.Deserialize(jsonTextReader, typeof(GemPriceListGoldToGems));
-                        return (list.Gems);
+                        //GemPriceListGoldToGems list = (GemPriceListGoldToGems)serializer.Deserialize(jsonTextReader, typeof(GemPriceListGoldToGems));
+                        GemPrice list = (GemPrice)serializer.Deserialize(jsonTextReader, typeof(GemPrice));
+                        return (list);
                     }
                 }
             }
@@ -37,7 +38,7 @@ namespace GW2Miner.Engine
     public class GemPriceListGemsToGoldParser
     {
         public Object classLock = typeof(GemPriceListGemsToGoldParser);
-        public GemPriceList2GemsToGold Parse(Stream inputStream)
+        public GemPrice Parse(Stream inputStream)
         {
             lock (classLock)
             {
@@ -51,8 +52,9 @@ namespace GW2Miner.Engine
                     using (JsonTextReader jsonTextReader = new JsonTextReader(streamReader))
                     {
                         //jsonTextReader.DateParseHandling = DateParseHandling.None;
-                        GemPriceListGemsToGold list = (GemPriceListGemsToGold)serializer.Deserialize(jsonTextReader, typeof(GemPriceListGemsToGold));
-                        return (list.Coins);
+                        //GemPriceListGemsToGold list = (GemPriceListGemsToGold)serializer.Deserialize(jsonTextReader, typeof(GemPriceListGemsToGold));
+                        GemPrice list = (GemPrice)serializer.Deserialize(jsonTextReader, typeof(GemPrice));
+                        return (list);
                     }
                 }
             }

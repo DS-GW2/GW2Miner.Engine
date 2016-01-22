@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Configuration;
 using System.IO.Compression;
+using System.Web.Http;
 using GW2SessionKey;
 
 namespace GW2Miner.Engine
@@ -36,12 +37,12 @@ namespace GW2Miner.Engine
         private String _loginURL = @"https://account.guildwars2.com/login?redirect_uri=http%3A%2F%2Ftradingpost-live.ncplatform.net%2Fauthenticate%3Fsource%3D%252F&game_code=gw2";
         //private String _loginURL = @"https://account.guildwars2.com/login?redirect_uri=http://tradingpost-live.ncplatform.net/authenticate?source=/me&game_code=gw2";
         //private String _loginURL = @"https://account.guildwars2.com/login?redirect_uri=http://tradingpost-live.ncplatform.net/authenticate?source=/me";
-        private String _accountEmail = "user"; // - empty for now
-        private String _accountPassword = "password"; // - empty for now
+        private String _accountEmail = "dspirit@gmail.com"; // - empty for now
+        private String _accountPassword = "thhedhjoker0411"; // - empty for now
         private bool _logined = false;
         private bool _loggingIn = false;
-        private bool _useGameSessionKey = false;
-        private bool _catchExceptions = true;
+        //private bool _useGameSessionKey = false;
+        private bool _catchExceptions = false;
         private event EventHandler _fnCallGW2LoginInstructions;
         private Object _fnCallGW2LoginInstructionsLock = new Object();
         private event EventHandler _fnGW2Logined;
@@ -53,7 +54,8 @@ namespace GW2Miner.Engine
         private Cookie _gameSessionKey;
         //private Cookie _mySessionKey;
         private int _retryRequest = 0;
-        private string _charId, _loginEmail;
+        private string _charId = "", _loginEmail, _referrer = @"https://account.guildwars2.com/login";
+        //private bool _loginTried = false;
 
         public static ConnectionManager Instance
         {
@@ -93,104 +95,139 @@ namespace GW2Miner.Engine
             // Open App.Config of executable
             _config = ConfigurationManager.OpenMappedExeConfiguration(configFileMap, ConfigurationUserLevel.None); // potential exception if config file cannot be loaded!
             if (_config.AppSettings.Settings["SessionKey"] != null) _gameSessionKey = new Cookie("s", _config.AppSettings.Settings["SessionKey"].Value);
-            if (_config.AppSettings.Settings["CharId"] != null) _charId = _config.AppSettings.Settings["CharId"].Value;
+            //if (_config.AppSettings.Settings["CharId"] != null) _charId = _config.AppSettings.Settings["CharId"].Value;
 
             // Must be done after getting the _gameSessionKey from the config
             //if (_useGameSessionKey) UseGameSessionKey = true;
-            UseGameSessionKey = _useGameSessionKey;
+            //UseGameSessionKey = _useGameSessionKey;
         }
 
-        public async Task<Stream> RequestItems(String page, String param, bool relogin)
+        //public async Task<Stream> RequestItems(String page, String param, bool relogin)
+        //{
+        //    String url;
+        //    Uri referrer;
+        //    lock (_classLock)
+        //    {
+        //        url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/{0}.json?{1}", page, param);
+        //        referrer = new Uri(@"https://tradingpost-live.ncplatform.net");
+        //    }
+
+        //    return await Request(url, referrer, relogin);
+        //}
+
+        public async Task<Stream> RequestItems(String param)
         {
             String url;
             Uri referrer;
             lock (_classLock)
             {
-                url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/{0}.json?{1}", page, param);
-                referrer = new Uri(@"https://tradingpost-live.ncplatform.net");
+                url = String.Format(@"https://api.guildwars2.com/v2/commerce/prices{0}", param);
+                referrer = new Uri(@"https://api.guildwars2.com/");
             }
 
-            return await Request(url, referrer, relogin);
+            return await Request(url, referrer, false);
         }
 
-        public async Task<Stream> RequestBuySellListing(int item_id, bool isBuyRequest, bool relogin)
+        //public async Task<Stream> RequestBuySellListing(int item_id, bool isBuyRequest, bool relogin)
+        //{
+        //    String url;
+        //    Uri referrer;
+
+        //    lock (_classLock)
+        //    {
+        //        url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/listings.json?type={0}&id={1}", (isBuyRequest ? "buys" : "sells"),
+        //                                            item_id);
+        //        referrer = new Uri(String.Format(@"https://tradingpost-live.ncplatform.net/item/{0}", item_id));
+
+        //        //UseGameSessionKey = true;
+        //    }
+
+        //    return await Request(url, referrer, relogin);
+        //}
+
+        public async Task<Stream> RequestBuySellListing(String param)
         {
             String url;
             Uri referrer;
 
             lock (_classLock)
             {
-                url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/listings.json?type={0}&id={1}", (isBuyRequest ? "buys" : "sells"),
-                                                    item_id);
-                referrer = new Uri(String.Format(@"https://tradingpost-live.ncplatform.net/item/{0}", item_id));
+                url = String.Format(@"https://api.guildwars2.com/v2/commerce/listings{0}", param);
+                referrer = new Uri(@"https://api.guildwars2.com/");
 
                 //UseGameSessionKey = true;
             }
 
-            return await Request(url, referrer, relogin);
+            return await Request(url, referrer, false);
         }
 
         public async Task<Stream> CancelBuySellListing(int item_id, long listing_id, bool isBuyRequest, bool relogin)
         {
-            String url;
-            Uri referrer;
+            throw new NotImplementedException("Cancel Buy Sell transaction not implemented!");
 
-            lock (_classLock)
-            {
-                url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/item/{0}/cancel.json?listing={1}&isbuy={2}&charid={3}", item_id,
-                                                                                                                                            listing_id,
-                                                                                                                                            (isBuyRequest ? "1" : "0"),
-                                                                                                                                            _charId);
-                referrer = new Uri(String.Format(@"https://tradingpost-live.ncplatform.net/me"));
+            //String url;
+            //Uri referrer;
 
-                UseGameSessionKey = true;
-            }
+            //lock (_classLock)
+            //{
+            //    url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/item/{0}/cancel.json?listing={1}&isbuy={2}&charid={3}", item_id,
+            //                                                                                                                                listing_id,
+            //                                                                                                                                (isBuyRequest ? "1" : "0"),
+            //                                                                                                                                _charId);
+            //    referrer = new Uri(String.Format(@"https://tradingpost-live.ncplatform.net/me"));
 
-            return await Post(url, referrer, relogin, new List<KeyValuePair<string, string>>());
+            //    UseGameSessionKey = true;
+            //}
+
+            //return await Post(url, referrer, relogin, new List<KeyValuePair<string, string>>());
         }
 
         public async Task<Stream> Buy(int item_id, int count, int price, bool relogin)
         {
-            String url;
-            Uri referrer;
-            List<KeyValuePair<string, string>> postData;
+            throw new NotImplementedException("Buy transaction not implemented!");
 
-            lock (_classLock)
-            {
-                url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/item/{0}/buy", item_id);
+            //String url;
+            //Uri referrer;
+            //List<KeyValuePair<string, string>> postData;
 
-                referrer = new Uri(String.Format(@"https://tradingpost-live.ncplatform.net/"));
+            //lock (_classLock)
+            //{
+            //    url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/item/{0}/buy", item_id);
 
-                UseGameSessionKey = true;
+            //    referrer = new Uri(String.Format(@"https://tradingpost-live.ncplatform.net/"));
 
-                postData = new List<KeyValuePair<string, string>>();
-                postData.Add(new KeyValuePair<string, string>("count", count.ToString()));
-                postData.Add(new KeyValuePair<string, string>("price", price.ToString()));
-                postData.Add(new KeyValuePair<string, string>("charid", _charId));
-            }
+            //    UseGameSessionKey = true;
 
-            return await Post(url, referrer, relogin, postData);
+            //    postData = new List<KeyValuePair<string, string>>();
+            //    postData.Add(new KeyValuePair<string, string>("count", count.ToString()));
+            //    postData.Add(new KeyValuePair<string, string>("price", price.ToString()));
+            //    postData.Add(new KeyValuePair<string, string>("charid", _charId));
+            //}
+
+            //return await Post(url, referrer, relogin, postData);
         }
 
         public async Task<Stream> RequestMyBuysSells(bool buy, bool relogin, int offset = 1, bool past = false, int count = 10)
         {
-            //await Request(@"https://tradingpost-live.ncplatform.net/me", new Uri(@"https://tradingpost-live.ncplatform.net"), false);
-            String url;
-            Uri referrer;
-            lock (_classLock)
-            {
-                url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/me.json?time={0}&type={1}&charid={2}&offset={3}&count={4}",
-                                                                                                                    (past ? "past" : "now"),
-                                                                                                                    (buy ? "buy" : "sell"),
-                                                                                                                    _charId,
-                                                                                                                    offset,
-                                                                                                                    count);
-                referrer = new Uri(@"https://tradingpost-live.ncplatform.net/me");
+            throw new NotImplementedException("Request My Buys Sells transaction not implemented!");
 
-                UseGameSessionKey = true;
-            }
+            ////await Request(@"https://tradingpost-live.ncplatform.net/me", new Uri(@"https://tradingpost-live.ncplatform.net"), false);
+            //String url;
+            //Uri referrer;
+            //lock (_classLock)
+            //{
+            //    url = String.Format(@"https://tradingpost-live.ncplatform.net/ws/me.json?time={0}&type={1}&charid={2}&offset={3}&count={4}",
+            //                                                                                                        (past ? "past" : "now"),
+            //                                                                                                        (buy ? "buy" : "sell"),
+            //                                                                                                        _charId,
+            //                                                                                                        offset,
+            //                                                                                                        count);
+            //    referrer = new Uri(@"https://tradingpost-live.ncplatform.net/me");
 
-            return await Request(url, referrer, relogin);
+            //    UseGameSessionKey = true;
+            //}
+
+            //return await Request(url, referrer, relogin);
         }
 
         public async Task<Stream> RequestGoldToGemsPrice(int coinQuantity)
@@ -199,10 +236,10 @@ namespace GW2Miner.Engine
             Uri referrer;
             lock (_classLock)
             {
-                url = String.Format(@"https://exchange-live.ncplatform.net/ws/rates.json?id={0}&coins={1}", _charId, coinQuantity);
-                referrer = new Uri(@"https://exchange-live.ncplatform.net/");
+                url = String.Format(@"https://api.guildwars2.com/v2/commerce/exchange/coins?quantity={0}", coinQuantity);
+                referrer = new Uri(@"https://api.guildwars2.com/");
 
-                UseGameSessionKey = true;
+                //UseGameSessionKey = true;
             }
 
             return await Request(url, referrer, false);
@@ -214,34 +251,34 @@ namespace GW2Miner.Engine
             Uri referrer;
             lock (_classLock)
             {
-                url = String.Format(@"https://exchange-live.ncplatform.net/ws/rates.json?id={0}&gems={1}", _charId, gemQuantity);
-                referrer = new Uri(@"https://exchange-live.ncplatform.net/");
+                url = String.Format(@"https://api.guildwars2.com/v2/commerce/exchange/gems?quantity={0}", gemQuantity);
+                referrer = new Uri(@"https://api.guildwars2.com/");
 
-                UseGameSessionKey = true;
+                //UseGameSessionKey = true;
             }
 
             return await Request(url, referrer, false);
         }
 
-        public bool UseGameSessionKey
-        {
-            get
-            {
-                return _useGameSessionKey;
-            }
+        //public bool UseGameSessionKey
+        //{
+        //    get
+        //    {
+        //        return _useGameSessionKey;
+        //    }
 
-            set
-            {
-                _cookieJar = new CookieContainer();
-                _logined = false;
-                _useGameSessionKey = value;
-                if (_useGameSessionKey)
-                {
-                    _cookieJar.Add(new Uri("https://tradingpost-live.ncplatform.net/"), _gameSessionKey);
-                    _cookieJar.Add(new Uri("https://exchange-live.ncplatform.net/"), _gameSessionKey);
-                }
-            }
-        }
+        //    set
+        //    {
+        //        _cookieJar = new CookieContainer();
+        //        _logined = false;
+        //        _useGameSessionKey = value;
+        //        if (_useGameSessionKey)
+        //        {
+        //            _cookieJar.Add(new Uri("https://tradingpost-live.ncplatform.net/"), _gameSessionKey);
+        //            _cookieJar.Add(new Uri("https://exchange-live.ncplatform.net/"), _gameSessionKey);
+        //        }
+        //    }
+        //}
 
         public bool CatchExceptions
         {
@@ -325,122 +362,122 @@ namespace GW2Miner.Engine
         //    }
         //}
 
-        private async Task<Stream> Post(String url, Uri referrer, bool relogin, List<KeyValuePair<string, string>> postData, bool acceptGzip = true, bool acceptDeflate = true)
-        {
-            if (relogin)
-            {
-                _logined = false;
-            }
+        //private async Task<Stream> Post(String url, Uri referrer, bool relogin, List<KeyValuePair<string, string>> postData, bool acceptGzip = true, bool acceptDeflate = true)
+        //{
+        //    if (relogin)
+        //    {
+        //        _logined = false;
+        //    }
 
-            if (!_logined)
-            {
-                await Login();
-            }
+        //    if (!_logined)
+        //    {
+        //        await Login();
+        //    }
 
-            WaitForFloodControl();
+        //    WaitForFloodControl();
 
-            try
-            {
-                HttpClientHandler handler = new HttpClientHandler()
-                {
-                    CookieContainer = _cookieJar
-                };
-                handler.UseCookies = true;
-                handler.UseDefaultCredentials = false;
+        //    try
+        //    {
+        //        HttpClientHandler handler = new HttpClientHandler()
+        //        {
+        //            CookieContainer = _cookieJar
+        //        };
+        //        handler.UseCookies = true;
+        //        handler.UseDefaultCredentials = false;
 
-                HttpContent content = new FormUrlEncodedContent(postData);
+        //        HttpContent content = new FormUrlEncodedContent(postData);
 
-                HttpClient client = new HttpClient(handler);
+        //        HttpClient client = new HttpClient(handler);
 
-                client.MaxResponseContentBufferSize = 3000000;
+        //        client.MaxResponseContentBufferSize = 3000000;
 
-                client.DefaultRequestHeaders.Referrer = referrer;
+        //        client.DefaultRequestHeaders.Referrer = referrer;
 
-                if (acceptGzip) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
-                if (acceptDeflate) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
-                client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("en"));
-                client.DefaultRequestHeaders.AcceptCharset.Add(new StringWithQualityHeaderValue("en"));
-                client.DefaultRequestHeaders.Connection.Add(@"keep-alive");
-                client.DefaultRequestHeaders.UserAgent.TryParseAdd(@"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1003.1 Safari/535.19 Awesomium/1.7.1");
-                client.DefaultRequestHeaders.Accept.TryParseAdd(@"*/*");
-                client.DefaultRequestHeaders.Add(@"X-Requested-With", @"XMLHttpRequest");
+        //        if (acceptGzip) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
+        //        if (acceptDeflate) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
+        //        client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("en"));
+        //        client.DefaultRequestHeaders.AcceptCharset.Add(new StringWithQualityHeaderValue("en"));
+        //        client.DefaultRequestHeaders.Connection.Add(@"keep-alive");
+        //        client.DefaultRequestHeaders.UserAgent.TryParseAdd(@"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1003.1 Safari/535.19 Awesomium/1.7.1");
+        //        client.DefaultRequestHeaders.Accept.TryParseAdd(@"*/*");
+        //        client.DefaultRequestHeaders.Add(@"X-Requested-With", @"XMLHttpRequest");
 
-                await client.PostAsync(url, content).ContinueWith(
-                      (postTask) =>
-                      {
-                          if (postTask.IsCanceled)
-                          {
-                              return;
-                          }
-                          if (postTask.IsFaulted)
-                          {
-                              throw postTask.Exception;
-                          }
-                          HttpResponseMessage postResponse = postTask.Result;
+        //        await client.PostAsync(url, content).ContinueWith(
+        //              (postTask) =>
+        //              {
+        //                  if (postTask.IsCanceled)
+        //                  {
+        //                      return;
+        //                  }
+        //                  if (postTask.IsFaulted)
+        //                  {
+        //                      throw postTask.Exception;
+        //                  }
+        //                  HttpResponseMessage postResponse = postTask.Result;
 
-                          // NOTE: 401 Status Code here if session key has expired!
-                          if (postResponse.StatusCode == HttpStatusCode.Unauthorized && (_retryRequest == 0))
-                          {
-                              if (UseGameSessionKey)
-                              {
-                                  GetGameClientInfo();
-                              }
-                              _retryRequest++;
-                              Task t = Task.Run(async () => { return await Post(url, referrer, true, postData, acceptGzip, acceptDeflate); });
-                              t.Wait();
-                              return;
-                          }
-                          else if ((postResponse.StatusCode == HttpStatusCode.ServiceUnavailable || postResponse.StatusCode == HttpStatusCode.BadGateway || 
-                                                        postResponse.StatusCode == HttpStatusCode.InternalServerError)
-                                        && (_retryRequest < RETRY_LIMIT))
-                          {
-                              Thread.Sleep(RETRY_COOLDOWN);
-                              _retryRequest++;
-                              Task t = Task.Run(async () => { return await Post(url, referrer, false, postData, acceptGzip, acceptDeflate); });
-                              t.Wait();
-                          }
-                          else
-                          {
-                              _retryRequest = 0;
-                              postResponse.EnsureSuccessStatusCode();
-                              _stream = postResponse.Content.ReadAsStreamAsync().Result;
-                              _stream = ProcessCompression(_stream, postResponse);
-                              //if (postResponse.Content.Headers.ContentEncoding.Contains(gzip.Value))
-                              //{
-                              //    _stream = new System.IO.Compression.GZipStream(_stream, System.IO.Compression.CompressionMode.Decompress);
-                              //}
-                              //else if (postResponse.Content.Headers.ContentEncoding.Contains(deflate.Value))
-                              //{
-                              //    _stream = new System.IO.Compression.DeflateStream(_stream, System.IO.Compression.CompressionMode.Decompress);
-                              //}
-                          }
-                      });
-            }
-            catch (Exception e)
-            {
-                if (!_catchExceptions) throw e;
+        //                  // NOTE: 401 Status Code here if session key has expired!
+        //                  if (postResponse.StatusCode == HttpStatusCode.Unauthorized && (_retryRequest == 0))
+        //                  {
+        //                      if (UseGameSessionKey)
+        //                      {
+        //                          GetGameClientInfo();
+        //                      }
+        //                      _retryRequest++;
+        //                      Task t = Task.Run(async () => { return await Post(url, referrer, true, postData, acceptGzip, acceptDeflate); });
+        //                      t.Wait();
+        //                      return;
+        //                  }
+        //                  else if ((postResponse.StatusCode == HttpStatusCode.ServiceUnavailable || postResponse.StatusCode == HttpStatusCode.BadGateway || 
+        //                                                postResponse.StatusCode == HttpStatusCode.InternalServerError)
+        //                                && (_retryRequest < RETRY_LIMIT))
+        //                  {
+        //                      Thread.Sleep(RETRY_COOLDOWN);
+        //                      _retryRequest++;
+        //                      Task t = Task.Run(async () => { return await Post(url, referrer, false, postData, acceptGzip, acceptDeflate); });
+        //                      t.Wait();
+        //                  }
+        //                  else
+        //                  {
+        //                      _retryRequest = 0;
+        //                      postResponse.EnsureSuccessStatusCode();
+        //                      _stream = postResponse.Content.ReadAsStreamAsync().Result;
+        //                      _stream = ProcessCompression(_stream, postResponse);
+        //                      //if (postResponse.Content.Headers.ContentEncoding.Contains(gzip.Value))
+        //                      //{
+        //                      //    _stream = new System.IO.Compression.GZipStream(_stream, System.IO.Compression.CompressionMode.Decompress);
+        //                      //}
+        //                      //else if (postResponse.Content.Headers.ContentEncoding.Contains(deflate.Value))
+        //                      //{
+        //                      //    _stream = new System.IO.Compression.DeflateStream(_stream, System.IO.Compression.CompressionMode.Decompress);
+        //                      //}
+        //                  }
+        //              });
+        //    }
+        //    catch (Exception e)
+        //    {
+        //        if (!_catchExceptions) throw e;
 
-                // handle error
-                Console.WriteLine("Post Exception:");
-                Console.WriteLine(e.Message);
-            }
+        //        // handle error
+        //        Console.WriteLine("Post Exception:");
+        //        Console.WriteLine(e.Message);
+        //    }
 
-            return _stream;
-        }
+        //    return _stream;
+        //}
 
         private async Task<Stream> Request(String url, Uri referrer, bool relogin, bool acceptGzip = true, bool acceptDeflate = true)
         {
-            if (relogin)
-            {
-                _logined = false;
-            }
+            //if (relogin)
+            //{
+            //    _logined = false;
+            //}
 
-            if (!_logined)
-            {
-                await Login();
-            }
+            //if (!_logined)
+            //{
+            //    await Login();
+            //}
 
-            WaitForFloodControl();
+            //WaitForFloodControl();
 
             try
             {
@@ -454,7 +491,8 @@ namespace GW2Miner.Engine
 
                 client.MaxResponseContentBufferSize = 3000000;
 
-                client.DefaultRequestHeaders.Referrer = referrer;
+                // Disable with new commerce api
+                //client.DefaultRequestHeaders.Referrer = referrer;
 
                 if (acceptGzip) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
                 if (acceptDeflate) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
@@ -481,16 +519,16 @@ namespace GW2Miner.Engine
                             // NOTE: 401 Status Code here if session key has expired!
                             if (getResponse.StatusCode == HttpStatusCode.Unauthorized && (_retryRequest == 0))
                             {
-                                if (UseGameSessionKey)
-                                {
-                                    GetGameClientInfo();
-                                }
+                                //if (UseGameSessionKey)
+                                //{
+                                //    GetGameClientInfo();
+                                //}
                                 _retryRequest++;
                                 Task t = Task.Run(async () => { return await Request(url, referrer, true, acceptGzip, acceptDeflate); });
                                 t.Wait();
                                 return;
                             }
-                            else if ((getResponse.StatusCode == HttpStatusCode.ServiceUnavailable || getResponse.StatusCode == HttpStatusCode.BadGateway ||
+                            else if ((getResponse.StatusCode == HttpStatusCode.ServiceUnavailable || getResponse.StatusCode == HttpStatusCode.BadGateway || 
                                                         getResponse.StatusCode == HttpStatusCode.InternalServerError)
                                         && (_retryRequest < RETRY_LIMIT))
                             {
@@ -498,6 +536,15 @@ namespace GW2Miner.Engine
                                 _retryRequest++;
                                 Task t = Task.Run(async () => { return await Request(url, referrer, false, acceptGzip, acceptDeflate); });
                                 t.Wait();
+                            }
+                            else if (getResponse.StatusCode == HttpStatusCode.BadRequest)
+                            {
+                                _stream = Stream.Null;
+                                return;
+                            }
+                            else if (getResponse.StatusCode == HttpStatusCode.NotFound || getResponse.StatusCode == HttpStatusCode.BadRequest)
+                            {
+                                throw new HttpResponseException(getResponse);
                             }
                             else
                             {
@@ -528,108 +575,176 @@ namespace GW2Miner.Engine
             return _stream;
         }
 
-        private async Task Login()
-        {
-            if (UseGameSessionKey)
-            {
-                IndicateLogined();
-                return;
-            }
+        //private async Task Login2(String url, Uri referrer, bool acceptGzip = true, bool acceptDeflate = true)
+        //{
+        //    WaitForFloodControl();
 
-            if (!_loggingIn)
-            {
-                _loggingIn = true;
+        //    HttpClientHandler handler = new HttpClientHandler()
+        //    {
+        //        CookieContainer = _cookieJar
+        //    };
+        //    handler.UseCookies = true;
+        //    handler.AllowAutoRedirect = true;
+        //    handler.UseDefaultCredentials = false;
+        //    HttpClient client = new HttpClient(handler);
 
-                WaitForFloodControl();
+        //    client.MaxResponseContentBufferSize = 3000000;
 
-                try
-                {
-                    HttpClientHandler handler = new HttpClientHandler()
-                    {
-                        CookieContainer = _cookieJar
-                    };                    
-                    handler.UseCookies = true;
-                    handler.UseDefaultCredentials = false;
-                    handler.AllowAutoRedirect = false;
-                    HttpClient client = new HttpClient(handler);
+        //    client.DefaultRequestHeaders.Referrer = referrer;
+        //    if (acceptGzip) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
+        //    if (acceptDeflate) client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
+        //    client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("en"));
+        //    client.DefaultRequestHeaders.AcceptCharset.Add(new StringWithQualityHeaderValue("en"));
+        //    client.DefaultRequestHeaders.Connection.Add(@"keep-alive");
+        //    client.DefaultRequestHeaders.UserAgent.TryParseAdd(@"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1003.1 Safari/535.19 Awesomium/1.7.1");
+        //    client.DefaultRequestHeaders.Accept.TryParseAdd(@"*/*");
+        //    client.DefaultRequestHeaders.Add(@"X-Requested-With", @"XMLHttpRequest");
 
-                    List<KeyValuePair<string, string>> postData = new List<KeyValuePair<string, string>>();
-                    postData.Add(new KeyValuePair<string, string>("email", _accountEmail));
-                    postData.Add(new KeyValuePair<string, string>("password", _accountPassword));
+        //    await client.GetAsync(url).ContinueWith(
+        //    (getTask) =>
+        //    {
+        //        if (getTask.IsCanceled)
+        //        {
+        //            return;
+        //        }
+        //        if (getTask.IsFaulted)
+        //        {
+        //            throw getTask.Exception;
+        //        }
+        //        HttpResponseMessage getResponse = getTask.Result;
 
-                    HttpContent content = new FormUrlEncodedContent(postData);
+        //        int i;
+        //        IEnumerable<string> cookies = getResponse.Headers.GetValues("Set-Cookie");
+        //        if (cookies != null && (i = cookies.ElementAt(0).IndexOf("s=")) >= 0)
+        //        {
+        //            string value = cookies.ElementAt(0).Substring(i + 2, cookies.ElementAt(0).IndexOf(';', i) - i - 2);
+        //            Cookie sessionKey = new Cookie("s", value);
+        //            _cookieJar.Add(new Uri("https://tradingpost-live.ncplatform.net/"), sessionKey);
+        //            _cookieJar.Add(new Uri("https://exchange-live.ncplatform.net/"), sessionKey);
+        //            _cookieJar.Add(new Uri("https://account.guildwars2.com/"), sessionKey);
+        //        }
+        //        else
+        //        {
+        //            UseGameSessionKey = true;
+        //        }
+        //    });
 
-                    client.DefaultRequestHeaders.Referrer = new Uri(@"https://account.guildwars2.com/login");
+        //    //IndicateLogined();            
+        //}
+        
+        //private async Task Login()
+        //{
+        //    if (UseGameSessionKey)
+        //    {
+        //        IndicateLogined();
+        //        return;
+        //    }
 
-                    client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
-                    client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
-                    client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("en"));
-                    client.DefaultRequestHeaders.AcceptCharset.Add(new StringWithQualityHeaderValue("en"));
-                    client.DefaultRequestHeaders.Connection.Add(@"keep-alive");
-                    client.DefaultRequestHeaders.UserAgent.TryParseAdd(@"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1003.1 Safari/535.19 Awesomium/1.7.1");
-                    client.DefaultRequestHeaders.Accept.TryParseAdd(@"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+        //    if (!_loggingIn)
+        //    {
+        //        _loggingIn = true;
 
-                    await client.PostAsync(_loginURL, content).ContinueWith(
-                        (postTask) =>
-                        {
-                            if (postTask.IsCanceled)
-                            {
-                                return;
-                            }
-                            if (postTask.IsFaulted)
-                            {
-                                throw postTask.Exception;
-                            }
+        //        WaitForFloodControl();
 
-                            HttpResponseMessage postResponse = postTask.Result;
+        //        try
+        //        {
+        //            Task l = Task.Run(async () => { await Login2(_loginURL, new Uri(_referrer)); });
+        //            l.Wait();
 
-                            // NOTE: 401 Status Code here if traditional login failed!
-                            if (postResponse.StatusCode == HttpStatusCode.Unauthorized && !UseGameSessionKey)
-                            {
-                                if (_catchExceptions)
-                                {
-                                    Console.WriteLine("URL Login failed!  Falling back to using game session key!");
-                                }
-                                UseGameSessionKey = true;
-                            }
-                            else
-                            {
-                                //postTask.Result.EnsureSuccessStatusCode();
-                                int i;
-                                IEnumerable<string> cookies = postResponse.Headers.GetValues("Set-Cookie");
-                                if (cookies != null && (i = cookies.ElementAt(0).IndexOf("s=")) >= 0)
-                                {
-                                    string value = cookies.ElementAt(0).Substring(i + 2, cookies.ElementAt(0).IndexOf(';', i) - i - 2);
-                                    Cookie sessionKey = new Cookie("s", value);
-                                    _cookieJar.Add(new Uri("https://tradingpost-live.ncplatform.net/"), sessionKey);
-                                    _cookieJar.Add(new Uri("https://exchange-live.ncplatform.net/"), sessionKey);
-                                }
-                                else
-                                {
-                                    UseGameSessionKey = true;
-                                }
-                            }
-                            IndicateLogined();
-                        });
-                }
-                catch (Exception e)
-                {
-                    if (UseGameSessionKey)
-                    {
-                        if (!_catchExceptions) throw e;
+        //            HttpClientHandler handler = new HttpClientHandler()
+        //            {
+        //                CookieContainer = _cookieJar
+        //            };
+        //            handler.UseCookies = true;
+        //            handler.UseDefaultCredentials = false;
+        //            handler.AllowAutoRedirect = true;
+        //            HttpClient client = new HttpClient(handler);
 
-                        // handle error
-                        Console.WriteLine("Login Exception:");
-                        Console.WriteLine(e.Message);
-                    }
-                    else
-                    {
-                        UseGameSessionKey = true;
-                        IndicateLogined();
-                    }
-                }
-            }
-        }
+        //            List<KeyValuePair<string, string>> postData = new List<KeyValuePair<string, string>>();
+        //            postData.Add(new KeyValuePair<string, string>("email", _accountEmail));
+        //            postData.Add(new KeyValuePair<string, string>("password", _accountPassword));
+
+        //            HttpContent content = new FormUrlEncodedContent(postData);
+
+        //            client.DefaultRequestHeaders.Referrer = new Uri(_referrer);
+
+        //            client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("gzip"));
+        //            client.DefaultRequestHeaders.AcceptEncoding.Add(new StringWithQualityHeaderValue("deflate"));
+        //            client.DefaultRequestHeaders.AcceptLanguage.Add(new StringWithQualityHeaderValue("en"));
+        //            client.DefaultRequestHeaders.AcceptCharset.Add(new StringWithQualityHeaderValue("en"));
+        //            client.DefaultRequestHeaders.Connection.Add(@"keep-alive");
+        //            client.DefaultRequestHeaders.UserAgent.TryParseAdd(@"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1003.1 Safari/535.19 Awesomium/1.7.1");
+        //            client.DefaultRequestHeaders.Accept.TryParseAdd(@"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+
+        //            await client.PostAsync(_loginURL, content).ContinueWith(
+        //                (postTask) =>
+        //                {
+        //                    if (postTask.IsCanceled)
+        //                    {
+        //                        return;
+        //                    }
+        //                    if (postTask.IsFaulted)
+        //                    {
+        //                        throw postTask.Exception;
+        //                    }
+
+        //                    HttpResponseMessage postResponse = postTask.Result;
+
+        //                    // NOTE: 401 Status Code here if traditional login failed!
+        //                    if (postResponse.StatusCode == HttpStatusCode.Unauthorized && !UseGameSessionKey)
+        //                    {
+        //                        if (_catchExceptions)
+        //                        {
+        //                            Console.WriteLine("URL Login failed!  Falling back to using game session key!");
+        //                        }
+        //                        UseGameSessionKey = true;
+        //                    }
+        //                    //else if (postResponse.StatusCode == HttpStatusCode.RedirectMethod && !_loginTried)
+        //                    //{
+        //                    //    IEnumerable<string> location = postResponse.Headers.GetValues("Location");
+        //                    //    string url = string.Format("https://account.guildwars2.com/{0}", location.ElementAt(0));
+        //                    //    Task t = Task.Run(async () => { await Login2(url, new Uri(_loginURL)); });
+        //                    //    t.Wait();
+        //                    //}
+        //                    //else
+        //                    //{
+        //                    //    //postTask.Result.EnsureSuccessStatusCode();
+        //                    //    int i;
+        //                    //    IEnumerable<string> cookies = postResponse.Headers.GetValues("Set-Cookie");
+        //                    //    if (cookies != null && (i = cookies.ElementAt(0).IndexOf("s=")) >= 0)
+        //                    //    {
+        //                    //        string value = cookies.ElementAt(0).Substring(i + 2, cookies.ElementAt(0).IndexOf(';', i) - i - 2);
+        //                    //        Cookie sessionKey = new Cookie("s", value);
+        //                    //        _cookieJar.Add(new Uri("https://tradingpost-live.ncplatform.net/"), sessionKey);
+        //                    //        _cookieJar.Add(new Uri("https://exchange-live.ncplatform.net/"), sessionKey);
+        //                    //        _cookieJar.Add(new Uri("https://account.guildwars2.com/"), sessionKey);
+        //                    //    }
+        //                    //    else
+        //                    //    {
+        //                    //        UseGameSessionKey = true;
+        //                    //    }
+        //                    //}
+        //                    IndicateLogined();
+        //                });
+        //        }
+        //        catch (Exception e)
+        //        {
+        //            if (UseGameSessionKey)
+        //            {
+        //                if (!_catchExceptions) throw e;
+
+        //                // handle error
+        //                Console.WriteLine("Login Exception:");
+        //                Console.WriteLine(e.Message);
+        //            }
+        //            else
+        //            {
+        //                UseGameSessionKey = true;
+        //                IndicateLogined();
+        //            }
+        //        }
+        //    }
+        //}
 
         private void IndicateLogined()
         {
@@ -637,10 +752,10 @@ namespace GW2Miner.Engine
             _loggingIn = false;
         }
 
-        private void WaitForFloodControl()
-        {
-            _timeSlots.GetSlot();
-        }
+        //private void WaitForFloodControl()
+        //{
+        //    _timeSlots.GetSlot();
+        //}
 
         private void GetLoginEmail()
         {
@@ -651,6 +766,8 @@ namespace GW2Miner.Engine
             Process p = processes[0];
 
             ProcessMemoryScanner scanner = new ProcessMemoryScanner(p);
+
+            _loginEmail = "dspirit@gmail.com";
 
             //TODO: Grab search pattern from config file instead
             //CPU Disasm
@@ -672,125 +789,130 @@ namespace GW2Miner.Engine
             }
         }
 
-        private void GetGameClientInfo()
-        {
-            lock (_classLock)
-            {
-                if (_fnCallGW2LoginInstructions != null) _fnCallGW2LoginInstructions(this, EventArgs.Empty);
-                else
-                {
-                    Console.WriteLine("Getting new session key from Guild Wars 2 client.  Please ensure that Guild Wars 2 is running, logined to the game, and open the trading post.");
-                    Console.WriteLine("Hit ENTER to continue...");
-                    Console.ReadLine();
-                }
+        //private void GetGameClientInfo()
+        //{
+        //    lock (_classLock)
+        //    {
+        //        if (_fnCallGW2LoginInstructions != null) _fnCallGW2LoginInstructions(this, EventArgs.Empty);
+        //        else
+        //        {
+        //            Console.WriteLine("Getting new session key from Guild Wars 2 client.  Please ensure that Guild Wars 2 is running, logined to the game, and open the trading post.");
+        //            Console.WriteLine("Hit ENTER to continue...");
+        //            Console.ReadLine();
+        //        }
 
-                Process[] processes = Process.GetProcessesByName("Gw2");
+        //        Process[] processes = Process.GetProcessesByName("Gw2");
 
-                while (processes.Length == 0)
-                {
-                    Thread.Sleep(10000);
-                    processes = Process.GetProcessesByName("Gw2");
-                }
+        //        while (processes.Length == 0)
+        //        {
+        //            Thread.Sleep(10000);
+        //            processes = Process.GetProcessesByName("Gw2");
+        //        }
 
-                //if (processes.Length == 0)
-                //{
-                //    throw new InvalidOperationException("Guild Wars 2 client NOT detected!  Please ensure that Guild Wars 2 is running and logined to the game.");
-                //}
-                Process p = processes[0];
+        //        //if (processes.Length == 0)
+        //        //{
+        //        //    throw new InvalidOperationException("Guild Wars 2 client NOT detected!  Please ensure that Guild Wars 2 is running and logined to the game.");
+        //        //}
+        //        Process p = processes[0];
 
-                ProcessMemoryScanner scanner = new ProcessMemoryScanner(p);
+        //        ProcessMemoryScanner scanner = new ProcessMemoryScanner(p);
 
-                //TODO: Grab search pattern from config file instead
-                // find current session key
-                string szSearchPattern = "8B4214A3xxxxxxxx";
+        //        //TODO: Grab search pattern from config file instead
+        //        // find current session key
+        //        // Address   Hex dump          Command                                  Comments
+        //        //00EEB057    8D5E 08         LEA EBX,[ESI+8]
+        //        //00EEB05A    3B05 D0FB2E02   CMP EAX,DWORD PTR DS:[22EFBD0]
+        //        //00EEB060    75 25           JNE SHORT 00EEB087
+        //        string szSearchPattern = "8D5E083B05xxxxxxxx";
 
-                Guid sessionKey = scanner.FindGuid(szSearchPattern, 4);
+        //        Guid sessionKey = scanner.FindGuid(szSearchPattern, 5);
 
-                while (sessionKey == Guid.Empty)
-                {
-                    sessionKey = scanner.FindGuid(szSearchPattern, 4);
-                    Thread.Sleep(1000);
-                }
+        //        while (sessionKey == Guid.Empty)
+        //        {
+        //            sessionKey = scanner.FindGuid(szSearchPattern, 5);
+        //            Thread.Sleep(1000);
+        //        }
 
-                //if (sessionKey == Guid.Empty)
-                //{
-                //    throw new InvalidOperationException("Please ensure that Guild Wars 2 is running and logined to the game.");
-                //}
+        //        //if (sessionKey == Guid.Empty)
+        //        //{
+        //        //    throw new InvalidOperationException("Please ensure that Guild Wars 2 is running and logined to the game.");
+        //        //}
 
-                string sessionKeyString = string.Format("{0}", sessionKey.ToString().ToUpper());
+        //        string sessionKeyString = string.Format("{0}", sessionKey.ToString().ToUpper());
 
-                _gameSessionKey = new Cookie("s", sessionKeyString);
+        //        _gameSessionKey = new Cookie("s", sessionKeyString);
 
-                if (_config.AppSettings.Settings["SessionKey"] != null)
-                    _config.AppSettings.Settings["SessionKey"].Value = sessionKeyString;
-                else
-                    _config.AppSettings.Settings.Add("SessionKey", sessionKeyString);
+        //        if (_config.AppSettings.Settings["SessionKey"] != null)
+        //            _config.AppSettings.Settings["SessionKey"].Value = sessionKeyString;
+        //        else
+        //            _config.AppSettings.Settings.Add("SessionKey", sessionKeyString);
 
-                //processes = Process.GetProcessesByName("awesomium_process");
+        //        //processes = Process.GetProcessesByName("awesomium_process");
 
-                //while (processes.Length == 0)
-                //{
-                //    Thread.Sleep(10000);
-                //    processes = Process.GetProcessesByName("awesomium_process");
-                //}
+        //        //while (processes.Length == 0)
+        //        //{
+        //        //    Thread.Sleep(10000);
+        //        //    processes = Process.GetProcessesByName("awesomium_process");
+        //        //}
 
-                //TODO: Grab search pattern from config file instead
-                //      or grab the character id guid from Mumble shared memory instead
-                // find current character id
-                szSearchPattern = "898560FFFFFFA1xxxxxxxx";
+        //        //TODO: Grab search pattern from config file instead
+        //        //      or grab the character id guid from Mumble shared memory instead
+        //        // find current character id
+        //        //szSearchPattern = "898560FFFFFFA1xxxxxxxx";
 
-                Guid charId = scanner.FindGuid(szSearchPattern, 7);
-                _charId = string.Format("{0}", charId.ToString().ToUpper());
+        //        //Guid charId = scanner.FindGuid(szSearchPattern, 7);
+        //        //_charId = string.Format("{0}", charId.ToString().ToUpper());
 
-                if (_config.AppSettings.Settings["CharId"] != null)
-                    _config.AppSettings.Settings["CharId"].Value = _charId;
-                else
-                    _config.AppSettings.Settings.Add("CharId", _charId);
+        //        //if (_config.AppSettings.Settings["CharId"] != null)
+        //        //    _config.AppSettings.Settings["CharId"].Value = _charId;
+        //        //else
+        //        //    _config.AppSettings.Settings.Add("CharId", _charId);
+        //        _charId = "";
 
-                GetLoginEmail();
+        //        GetLoginEmail();
 
-                _config.Save(ConfigurationSaveMode.Modified);
+        //        _config.Save(ConfigurationSaveMode.Modified);
 
-                ConfigurationManager.RefreshSection("appSettings");
+        //        ConfigurationManager.RefreshSection("appSettings");
 
-                _cookieJar = new CookieContainer();
-                _cookieJar.Add(new Uri("https://tradingpost-live.ncplatform.net/"), _gameSessionKey);
-                _cookieJar.Add(new Uri("https://exchange-live.ncplatform.net/"), _gameSessionKey);
+        //        _cookieJar = new CookieContainer();
+        //        _cookieJar.Add(new Uri("https://tradingpost-live.ncplatform.net/"), _gameSessionKey);
+        //        _cookieJar.Add(new Uri("https://exchange-live.ncplatform.net/"), _gameSessionKey);
 
-                WaitForGameSession();
+        //        WaitForGameSession();
 
-                if (_fnGW2Logined != null) _fnGW2Logined(this, EventArgs.Empty);
+        //        if (_fnGW2Logined != null) _fnGW2Logined(this, EventArgs.Empty);
 
-                return;
-            }
-        }
+        //        return;
+        //    }
+        //}
 
-        private void WaitForGameSession()
-        {
-            bool tempExceptionsSetting = _catchExceptions;
-            _catchExceptions = false;
-            UseGameSessionKey = true;
-            _retryRequest = RETRY_LIMIT;
+        //private void WaitForGameSession()
+        //{
+        //    bool tempExceptionsSetting = _catchExceptions;
+        //    _catchExceptions = false;
+        //    UseGameSessionKey = true;
+        //    _retryRequest = RETRY_LIMIT;
 
-            bool needToWait = true;
-            while (needToWait)
-            {
-                try
-                {
-                    needToWait = false;
-                    Task t = RequestGemsToGoldPrice(10000);
-                    t.Wait();
-                }
-                catch (Exception)
-                {
-                    needToWait = true;
-                }
+        //    bool needToWait = true;
+        //    while (needToWait)
+        //    {
+        //        try
+        //        {
+        //            needToWait = false;
+        //            Task t = RequestGemsToGoldPrice(10000);
+        //            t.Wait();
+        //        }
+        //        catch (Exception)
+        //        {
+        //            needToWait = true;
+        //        }
 
-                Thread.Sleep(10000);
-            }
+        //        Thread.Sleep(10000);
+        //    }
 
-            _catchExceptions = tempExceptionsSetting;
-            _retryRequest = 0;
-        }
+        //    _catchExceptions = tempExceptionsSetting;
+        //    _retryRequest = 0;
+        //}
     }
 }

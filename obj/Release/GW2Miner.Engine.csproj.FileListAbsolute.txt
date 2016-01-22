@@ -1,0 +1,9 @@
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\obj\Release\ResolveAssemblyReference.cache
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\bin\Release\GW2Miner.Engine.dll
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\bin\Release\GW2Miner.Engine.pdb
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\bin\Release\GW2Miner.Domain.dll
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\bin\Release\Newtonsoft.Json.dll
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\bin\Release\GW2Miner.Domain.pdb
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\bin\Release\Newtonsoft.Json.xml
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\obj\Release\GW2Miner.Engine.dll
+C:\David\gw2\tp\GW2Miner-master\GW2Miner\GW2Miner.Engine\obj\Release\GW2Miner.Engine.pdb

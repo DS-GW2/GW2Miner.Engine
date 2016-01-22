@@ -44,6 +44,14 @@ namespace GW2Miner.Engine
             return await Request(url);
         }
 
+        public async Task<Stream> RequestGw2spidyFullItemList(int type)
+        {
+            string typeString = (type < 0) ? "all" : type.ToString();
+            String url = String.Format(@"http://www.gw2spidy.com/api/{0}/json/all-items/{1}", API_VERSION, typeString);
+
+            return await Request(url);
+        }
+
         public async Task<Stream> RequestGw2spidyRecipe(int recipeId)
         {
             String url = String.Format(@"http://www.gw2spidy.com/api/{0}/json/recipe/{1}", API_VERSION, recipeId);
